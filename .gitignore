@@ -1,0 +1,50 @@
+# --- Environment / secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- Python (backend) ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.uv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# --- Node / Next.js (frontend) ---
+node_modules/
+.next/
+out/
+.turbo/
+next-env.d.ts
+*.tsbuildinfo
+
+# --- Docker ---
+*.pid
+
+# --- Storage (local dev uploads) ---
+storage/local/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.claude/
+
+# --- Internal planning docs (not tracked in git) ---
+.ai/
+
+# --- Logs ---
+*.log
+npm-debug.log*
