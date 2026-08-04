@@ -3,9 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_v1_router
 from app.config.settings import get_settings
+from app.core.logging import configure_logging
+from app.exceptions.handlers import register_exception_handlers
 
 
 def create_app() -> FastAPI:
+    configure_logging()
     settings = get_settings()
 
     app = FastAPI(title="AI Career Operating System API", version="0.1.0")
@@ -18,6 +21,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    register_exception_handlers(app)
     app.include_router(api_v1_router)
 
     return app

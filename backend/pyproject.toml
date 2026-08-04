@@ -8,7 +8,7 @@ dependencies = [
     "argon2-cffi>=25.1.0",
     "fastapi>=0.141.1",
     "psycopg[binary]>=3.3.4",
-    "pydantic>=2",
+    "pydantic[email]>=2",
     "pydantic-settings>=2.14.2",
     "python-jose[cryptography]>=3.5.0",
     "python-multipart>=0.0.32",
@@ -23,12 +23,17 @@ package = false
 [tool.ruff]
 line-length = 100
 target-version = "py313"
+extend-exclude = ["alembic/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "features"]
+asyncio_mode = "auto"
+
+[tool.mypy]
+exclude = ["alembic/versions"]
 
 [dependency-groups]
 dev = [
@@ -37,4 +42,5 @@ dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "ruff>=0.16.1",
+    "types-python-jose>=3.5.0.20260408",
 ]

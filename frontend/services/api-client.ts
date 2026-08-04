@@ -1,6 +1,9 @@
+import { useAuthStore } from "@/store/auth-store";
 import type { ApiResponse, ErrorDetail } from "@/types/api";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+
+const NO_RETRY_PATHS = ["/auth/login", "/auth/refresh", "/auth/register"];
 
 export class ApiError extends Error {
   constructor(
@@ -13,14 +16,52 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+async function rawRequest(path: string, init?: RequestInit): Promise<Response> {
+  const accessToken = useAuthStore.getState().accessToken;
+
+  return fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...init?.headers,
     },
   });
+}
+
+async function refreshAccessToken(): Promise<boolean> {
+  const refreshToken = useAuthStore.getState().refreshToken;
+  if (!refreshToken) return false;
+
+  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+
+  if (!response.ok) return false;
+
+  const body = (await response.json()) as ApiResponse<{
+    access_token: string;
+    refresh_token: string;
+  }>;
+  if (!body.success) return false;
+
+  useAuthStore.getState().setAccessToken(body.data.access_token, body.data.refresh_token);
+  return true;
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  let response = await rawRequest(path, init);
+
+  if (response.status === 401 && !NO_RETRY_PATHS.includes(path)) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      response = await rawRequest(path, init);
+    } else {
+      useAuthStore.getState().clearSession();
+    }
+  }
 
   const body = (await response.json()) as ApiResponse<T>;
 

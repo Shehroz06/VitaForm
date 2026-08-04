@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
 
     cors_origins: list[str] = ["http://localhost:3000"]
+    frontend_base_url: str = "http://localhost:3000"
+
+    email_verification_token_expires_hours: int = 24
+    password_reset_token_expires_hours: int = 1
 
 
 @lru_cache
