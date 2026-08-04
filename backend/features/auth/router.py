@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request, status
 
 from app.dependencies.auth import CurrentUser, require_role
-from app.schemas.response import SuccessResponse
+from app.schemas.response import MessageResponse, SuccessResponse
 from features.auth.dependencies import (
     get_login_use_case,
     get_logout_use_case,
@@ -18,7 +18,6 @@ from features.auth.schemas import (
     ForgotPasswordRequest,
     LoginRequest,
     LogoutRequest,
-    MessageResponse,
     RefreshRequest,
     RegisterRequest,
     ResetPasswordRequest,

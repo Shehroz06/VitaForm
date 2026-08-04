@@ -15,10 +15,10 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.core.email import get_email_sender
+from app.database import models_registry  # noqa: F401  (registers all feature tables)
 from app.database.base import Base
 from app.database.session import get_db
 from app.main import create_app
-from features.auth import models as auth_models  # noqa: F401  (registers tables)
 from features.auth.constants import DEFAULT_ROLES
 
 TEST_DATABASE_URL = os.environ.get(

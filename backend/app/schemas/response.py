@@ -19,3 +19,7 @@ class ErrorResponse(BaseModel):
     success: bool = False
     message: str
     errors: list[ErrorDetail] = []
+
+
+class MessageResponse(BaseModel):
+    message: str
