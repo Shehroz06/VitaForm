@@ -50,3 +50,21 @@ class FilePurpose(StrEnum):
     AVATAR = "avatar"
     CERTIFICATE = "certificate"
     ACHIEVEMENT = "achievement"
+    RESUME = "resume"
+
+
+class SectionType(StrEnum):
+    """Resume section types. SUMMARY is free-text; the rest reference items
+    from the matching profile sub-resource by id. Deliberately scoped to the
+    most common resume sections for Phase 5 -- the remaining profile modules
+    (research, volunteer work, languages, etc.) use the exact same shape and
+    can be added to SECTION_REGISTRY later without a schema change."""
+
+    SUMMARY = "summary"
+    EDUCATION = "education"
+    EXPERIENCE = "experience"
+    PROJECTS = "projects"
+    SKILLS = "skills"
+    CERTIFICATIONS = "certifications"
+    ACHIEVEMENTS = "achievements"
+    AWARDS = "awards"

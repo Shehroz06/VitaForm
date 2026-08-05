@@ -35,16 +35,39 @@ class FileUploadService:
         extension = validate_upload(
             purpose, upload_file.filename, upload_file.content_type, len(content), self._settings
         )
+        content_type = upload_file.content_type or "application/octet-stream"
+        filename = upload_file.filename or f"upload.{extension}"
+        return await self._persist(profile_id, purpose, filename, content_type, content)
 
+    async def store_generated(
+        self,
+        profile_id: uuid.UUID,
+        purpose: FilePurpose,
+        filename: str,
+        content_type: str,
+        content: bytes,
+    ) -> File:
+        """Stores server-generated content (e.g. a rendered resume PDF) that
+        was never user-uploaded, so it skips upload validation entirely."""
+        return await self._persist(profile_id, purpose, filename, content_type, content)
+
+    async def _persist(
+        self,
+        profile_id: uuid.UUID,
+        purpose: FilePurpose,
+        filename: str,
+        content_type: str,
+        content: bytes,
+    ) -> File:
+        extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else "bin"
         stored_filename = f"{uuid.uuid4()}.{extension}"
         storage_path = f"{profile_id}/{stored_filename}"
-        content_type = upload_file.content_type or "application/octet-stream"
         await self._storage.save(storage_path, content, content_type)
 
         entity = await self._repository.create(
             profile_id=profile_id,
             purpose=purpose,
-            original_filename=upload_file.filename or stored_filename,
+            original_filename=filename,
             stored_filename=stored_filename,
             content_type=content_type,
             size_bytes=len(content),

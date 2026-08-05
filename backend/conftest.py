@@ -20,6 +20,7 @@ from app.database.base import Base
 from app.database.session import get_db
 from app.main import create_app
 from features.auth.constants import DEFAULT_ROLES
+from features.resumes.constants import DEFAULT_TEMPLATES
 
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL",
@@ -58,6 +59,26 @@ async def _seed_default_roles(conn: AsyncConnection) -> None:
     )
 
 
+async def _seed_default_resume_templates(conn: AsyncConnection) -> None:
+    templates_table = Base.metadata.tables["resume_templates"]
+    now = datetime.now(UTC)
+    await conn.execute(
+        templates_table.insert(),
+        [
+            {
+                "id": uuid.uuid4(),
+                "slug": slug,
+                "name": name,
+                "description": description,
+                "is_active": True,
+                "created_at": now,
+                "updated_at": now,
+            }
+            for slug, name, description in DEFAULT_TEMPLATES
+        ],
+    )
+
+
 @pytest_asyncio.fixture(scope="session")
 async def test_engine():  # type: ignore[no-untyped-def]
     await _ensure_test_database_exists()
@@ -79,6 +100,7 @@ async def _reset_database(test_engine) -> AsyncGenerator[None]:  # type: ignore[
         table_names = ", ".join(f'"{t.name}"' for t in reversed(Base.metadata.sorted_tables))
         await conn.execute(text(f"TRUNCATE TABLE {table_names} RESTART IDENTITY CASCADE"))
         await _seed_default_roles(conn)
+        await _seed_default_resume_templates(conn)
     yield
 
 

@@ -18,6 +18,7 @@ from features.profiles.router import router as profiles_router
 from features.projects.router import router as projects_router
 from features.references.router import router as references_router
 from features.research.router import router as research_router
+from features.resumes.router import router as resumes_router
 from features.skills.router import router as skills_router
 from features.volunteer_experience.router import router as volunteer_experience_router
 
@@ -30,6 +31,7 @@ api_v1_router.include_router(experience_router)
 api_v1_router.include_router(projects_router)
 api_v1_router.include_router(skills_router)
 api_v1_router.include_router(files_router)
+api_v1_router.include_router(resumes_router)
 api_v1_router.include_router(achievements_router)
 api_v1_router.include_router(certifications_router)
 api_v1_router.include_router(awards_router)

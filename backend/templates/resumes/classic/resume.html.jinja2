@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>{{ resume_title }}</title>
+<style>
+  @page { size: A4; margin: 2cm 2.2cm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Liberation Sans", Helvetica, Arial, sans-serif;
+    font-size: 10.5pt;
+    color: #1a1a1a;
+    line-height: 1.45;
+  }
+  header { margin-bottom: 14pt; border-bottom: 1.5pt solid #1a1a1a; padding-bottom: 8pt; }
+  h1.name { font-size: 20pt; margin: 0 0 2pt 0; font-weight: 700; }
+  p.headline { margin: 0 0 6pt 0; font-size: 11pt; color: #333; }
+  ul.contact { list-style: none; margin: 0; padding: 0; font-size: 9pt; color: #333; }
+  ul.contact li { display: inline; margin-right: 10pt; }
+  ul.contact li:not(:last-child)::after { content: "\2022"; margin-left: 10pt; color: #999; }
+  section.resume-section { margin-bottom: 12pt; }
+  h2.section-title {
+    font-size: 11.5pt; text-transform: uppercase; letter-spacing: 0.5pt;
+    border-bottom: 0.75pt solid #999; padding-bottom: 2pt; margin: 0 0 6pt 0;
+  }
+  p.summary-text { margin: 0; }
+  .entry { margin-bottom: 8pt; }
+  .entry:last-child { margin-bottom: 0; }
+  .entry-row { display: flex; justify-content: space-between; align-items: baseline; }
+  .entry-title { font-weight: 700; font-size: 10.5pt; }
+  .entry-subtitle { font-style: italic; color: #333; }
+  .entry-dates { font-size: 9pt; color: #555; white-space: nowrap; }
+  .entry-description { margin: 3pt 0 0 0; white-space: pre-line; }
+  ul.skills-list { list-style: none; margin: 0; padding: 0; }
+  ul.skills-list li {
+    display: inline-block; border: 0.75pt solid #999; border-radius: 3pt;
+    padding: 1pt 6pt; margin: 0 4pt 4pt 0; font-size: 9pt;
+  }
+  .links { font-size: 9pt; color: #333; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 class="name">{{ profile.headline or resume_title }}</h1>
+  {% if profile.headline %}<p class="headline">{{ resume_title }}</p>{% endif %}
+  <ul class="contact">
+    {% if contact_visibility.email %}<li>{{ email }}</li>{% endif %}
+    {% if contact_visibility.phone and profile.phone %}<li>{{ profile.phone }}</li>{% endif %}
+    {% if contact_visibility.location and profile.location %}<li>{{ profile.location }}</li>{% endif %}
+    {% if contact_visibility.website and profile.website_url %}<li>{{ profile.website_url }}</li>{% endif %}
+    {% if contact_visibility.github and profile.github_url %}<li>{{ profile.github_url }}</li>{% endif %}
+    {% if contact_visibility.linkedin and profile.linkedin_url %}<li>{{ profile.linkedin_url }}</li>{% endif %}
+  </ul>
+</header>
+
+{% for section in sections %}
+<section class="resume-section">
+  <h2 class="section-title">{{ section.title }}</h2>
+
+  {% if section.type == "summary" %}
+    <p class="summary-text">{{ section.text }}</p>
+
+  {% elif section.type == "education" %}
+    {% for item in section.entries %}
+    <div class="entry">
+      <div class="entry-row">
+        <span class="entry-title">{{ item.institution_name }}</span>
+        <span class="entry-dates">
+          {{ item.start_date.strftime("%b %Y") if item.start_date else "" }} –
+          {{ "Present" if item.is_current else (item.end_date.strftime("%b %Y") if item.end_date else "") }}
+        </span>
+      </div>
+      <div class="entry-subtitle">
+        {{ item.degree }}{% if item.field_of_study %}, {{ item.field_of_study }}{% endif %}
+        {% if item.grade %} · {{ item.grade }}{% endif %}
+      </div>
+      {% if item.description %}<p class="entry-description">{{ item.description }}</p>{% endif %}
+    </div>
+    {% endfor %}
+
+  {% elif section.type == "experience" %}
+    {% for item in section.entries %}
+    <div class="entry">
+      <div class="entry-row">
+        <span class="entry-title">{{ item.job_title }} · {{ item.company_name }}</span>
+        <span class="entry-dates">
+          {{ item.start_date.strftime("%b %Y") if item.start_date else "" }} –
+          {{ "Present" if item.is_current else (item.end_date.strftime("%b %Y") if item.end_date else "") }}
+        </span>
+      </div>
+      <div class="entry-subtitle">
+        {{ item.employment_type.value.replace("_", " ").title() }}
+        {% if item.location %} · {{ item.location }}{% endif %}
+      </div>
+      {% if item.description %}<p class="entry-description">{{ item.description }}</p>{% endif %}
+    </div>
+    {% endfor %}
+
+  {% elif section.type == "projects" %}
+    {% for item in section.entries %}
+    <div class="entry">
+      <div class="entry-row">
+        <span class="entry-title">{{ item.title }}</span>
+        <span class="entry-dates">
+          {{ item.start_date.strftime("%b %Y") if item.start_date else "" }}{% if item.end_date %} – {{ item.end_date.strftime("%b %Y") }}{% endif %}
+        </span>
+      </div>
+      {% if item.role %}<div class="entry-subtitle">{{ item.role }}</div>{% endif %}
+      {% if item.description %}<p class="entry-description">{{ item.description }}</p>{% endif %}
+      {% if item.skills %}
+      <p class="links">{{ item.skills | map(attribute="name") | join(", ") }}</p>
+      {% endif %}
+      {% if item.repository_url or item.demo_url %}
+      <p class="links">
+        {% if item.repository_url %}{{ item.repository_url }}{% endif %}
+        {% if item.repository_url and item.demo_url %} · {% endif %}
+        {% if item.demo_url %}{{ item.demo_url }}{% endif %}
+      </p>
+      {% endif %}
+    </div>
+    {% endfor %}
+
+  {% elif section.type == "skills" %}
+    <ul class="skills-list">
+      {% for item in section.entries %}
+      <li>{{ item.name }}{% if item.level %} ({{ item.level.value.title() }}){% endif %}</li>
+      {% endfor %}
+    </ul>
+
+  {% elif section.type == "certifications" %}
+    {% for item in section.entries %}
+    <div class="entry">
+      <div class="entry-row">
+        <span class="entry-title">{{ item.name }}</span>
+        <span class="entry-dates">{{ item.issue_date.strftime("%b %Y") if item.issue_date else "" }}</span>
+      </div>
+      <div class="entry-subtitle">{{ item.issuing_organization }}</div>
+    </div>
+    {% endfor %}
+
+  {% elif section.type == "achievements" %}
+    {% for item in section.entries %}
+    <div class="entry">
+      <div class="entry-row">
+        <span class="entry-title">{{ item.title }}</span>
+        <span class="entry-dates">{{ item.date_achieved.strftime("%b %Y") if item.date_achieved else "" }}</span>
+      </div>
+      {% if item.issuer %}<div class="entry-subtitle">{{ item.issuer }}</div>{% endif %}
+      {% if item.description %}<p class="entry-description">{{ item.description }}</p>{% endif %}
+    </div>
+    {% endfor %}
+
+  {% elif section.type == "awards" %}
+    {% for item in section.entries %}
+    <div class="entry">
+      <div class="entry-row">
+        <span class="entry-title">{{ item.title }}</span>
+        <span class="entry-dates">{{ item.date_received.strftime("%b %Y") if item.date_received else "" }}</span>
+      </div>
+      {% if item.issuer %}<div class="entry-subtitle">{{ item.issuer }}</div>{% endif %}
+      {% if item.description %}<p class="entry-description">{{ item.description }}</p>{% endif %}
+    </div>
+    {% endfor %}
+  {% endif %}
+</section>
+{% endfor %}
+
+</body>
+</html>

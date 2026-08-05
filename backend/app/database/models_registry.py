@@ -22,5 +22,6 @@ from features.profiles import models as profiles_models  # noqa: F401
 from features.projects import models as projects_models  # noqa: F401
 from features.references import models as references_models  # noqa: F401
 from features.research import models as research_models  # noqa: F401
+from features.resumes import models as resumes_models  # noqa: F401
 from features.skills import models as skills_models  # noqa: F401
 from features.volunteer_experience import models as volunteer_experience_models  # noqa: F401

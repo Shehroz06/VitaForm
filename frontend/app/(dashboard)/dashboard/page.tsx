@@ -25,6 +25,9 @@ export default function DashboardPage() {
         <Button asChild>
           <Link href="/profile">Edit profile</Link>
         </Button>
+        <Button asChild variant="secondary">
+          <Link href="/resumes">Resumes</Link>
+        </Button>
         <Button variant="outline" onClick={handleLogout} disabled={logout.isPending}>
           {logout.isPending ? "Logging out..." : "Log out"}
         </Button>

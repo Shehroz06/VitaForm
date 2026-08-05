@@ -48,3 +48,5 @@ Thumbs.db
 # --- Logs ---
 *.log
 npm-debug.log*
+
+docs/
