@@ -29,3 +29,18 @@ class SkillLevel(StrEnum):
     INTERMEDIATE = "intermediate"
     ADVANCED = "advanced"
     EXPERT = "expert"
+
+
+class LanguageProficiency(StrEnum):
+    BASIC = "basic"
+    CONVERSATIONAL = "conversational"
+    PROFESSIONAL = "professional"
+    FLUENT = "fluent"
+    NATIVE = "native"
+
+
+class PatentStatus(StrEnum):
+    FILED = "filed"
+    PENDING = "pending"
+    GRANTED = "granted"
+    REJECTED = "rejected"

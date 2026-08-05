@@ -1,0 +1,98 @@
+import uuid
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, status
+
+from app.core.base_crud import BaseOwnedCrudService
+from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
+from app.schemas.response import MessageResponse, SuccessResponse
+from features.competitions.dependencies import get_competition_service
+from features.competitions.models import Competition
+from features.competitions.schemas import (
+    CompetitionCreateRequest,
+    CompetitionResponse,
+    CompetitionUpdateRequest,
+)
+from features.profiles.dependencies import CurrentProfile
+
+router = APIRouter(prefix="/competitions", tags=["competitions"])
+
+CompetitionServiceDep = Annotated[
+    BaseOwnedCrudService[Competition], Depends(get_competition_service)
+]
+
+
+@router.get("", response_model=SuccessResponse[list[CompetitionResponse]])
+async def list_competitions(
+    profile: CurrentProfile,
+    service: CompetitionServiceDep,
+    pagination: Annotated[PaginationParams, Depends(get_pagination)],
+) -> SuccessResponse[list[CompetitionResponse]]:
+    items, total = await service.list_owned(
+        profile.id,
+        page=pagination.page,
+        limit=pagination.limit,
+        sort_column=Competition.event_date,
+        sort_desc=True,
+    )
+    return SuccessResponse(
+        message="Competitions retrieved successfully.",
+        data=[CompetitionResponse.model_validate(item) for item in items],
+        meta=build_pagination_meta(pagination.page, pagination.limit, total),
+    )
+
+
+@router.post(
+    "", response_model=SuccessResponse[CompetitionResponse], status_code=status.HTTP_201_CREATED
+)
+async def create_competition(
+    data: CompetitionCreateRequest,
+    profile: CurrentProfile,
+    service: CompetitionServiceDep,
+) -> SuccessResponse[CompetitionResponse]:
+    entity = await service.create_owned(profile.id, **data.model_dump())
+    return SuccessResponse(
+        message="Competition created successfully.",
+        data=CompetitionResponse.model_validate(entity),
+    )
+
+
+@router.get("/{competition_id}", response_model=SuccessResponse[CompetitionResponse])
+async def get_competition(
+    competition_id: uuid.UUID,
+    profile: CurrentProfile,
+    service: CompetitionServiceDep,
+) -> SuccessResponse[CompetitionResponse]:
+    entity = await service.get_owned(competition_id, profile.id)
+    return SuccessResponse(
+        message="Competition retrieved successfully.",
+        data=CompetitionResponse.model_validate(entity),
+    )
+
+
+@router.patch("/{competition_id}", response_model=SuccessResponse[CompetitionResponse])
+async def update_competition(
+    competition_id: uuid.UUID,
+    data: CompetitionUpdateRequest,
+    profile: CurrentProfile,
+    service: CompetitionServiceDep,
+) -> SuccessResponse[CompetitionResponse]:
+    entity = await service.update_owned(
+        competition_id, profile.id, **data.model_dump(exclude_unset=True)
+    )
+    return SuccessResponse(
+        message="Competition updated successfully.",
+        data=CompetitionResponse.model_validate(entity),
+    )
+
+
+@router.delete("/{competition_id}", response_model=SuccessResponse[MessageResponse])
+async def delete_competition(
+    competition_id: uuid.UUID,
+    profile: CurrentProfile,
+    service: CompetitionServiceDep,
+) -> SuccessResponse[MessageResponse]:
+    await service.delete_owned(competition_id, profile.id)
+    return SuccessResponse(
+        message="Competition deleted successfully.", data=MessageResponse(message="Deleted.")
+    )

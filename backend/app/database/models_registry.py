@@ -5,9 +5,21 @@ Base.metadata.create_all/drop_all. Add new feature model modules here as
 they're built.
 """
 
+from features.achievements import models as achievements_models  # noqa: F401
 from features.auth import models as auth_models  # noqa: F401
+from features.awards import models as awards_models  # noqa: F401
+from features.certifications import models as certifications_models  # noqa: F401
+from features.competitions import models as competitions_models  # noqa: F401
 from features.education import models as education_models  # noqa: F401
 from features.experience import models as experience_models  # noqa: F401
+from features.hackathons import models as hackathons_models  # noqa: F401
+from features.languages import models as languages_models  # noqa: F401
+from features.leadership_roles import models as leadership_roles_models  # noqa: F401
+from features.organizations import models as organizations_models  # noqa: F401
+from features.patents import models as patents_models  # noqa: F401
 from features.profiles import models as profiles_models  # noqa: F401
 from features.projects import models as projects_models  # noqa: F401
+from features.references import models as references_models  # noqa: F401
+from features.research import models as research_models  # noqa: F401
 from features.skills import models as skills_models  # noqa: F401
+from features.volunteer_experience import models as volunteer_experience_models  # noqa: F401
