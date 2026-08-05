@@ -15,3 +15,4 @@ class Achievement(CrudModelMixin, Base):
     issuer: Mapped[str | None] = mapped_column(String(200), default=None)
     date_achieved: Mapped[date | None] = mapped_column(default=None)
     description: Mapped[str | None] = mapped_column(Text, default=None)
+    file_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("files.id"), default=None)

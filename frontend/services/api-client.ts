@@ -18,11 +18,14 @@ export class ApiError extends Error {
 
 async function rawRequest(path: string, init?: RequestInit): Promise<Response> {
   const accessToken = useAuthStore.getState().accessToken;
+  // FormData bodies must not get a manual Content-Type: the browser sets its
+  // own multipart boundary, which we'd otherwise clobber.
+  const isFormData = init?.body instanceof FormData;
 
   return fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...init?.headers,
     },
@@ -79,4 +82,9 @@ export const apiClient = {
   patch: <T>(path: string, data?: unknown) =>
     request<T>(path, { method: "PATCH", body: data ? JSON.stringify(data) : undefined }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  upload: <T>(path: string, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request<T>(path, { method: "POST", body: formData });
+  },
 };

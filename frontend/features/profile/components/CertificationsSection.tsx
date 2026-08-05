@@ -1,8 +1,8 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Pencil, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Loader2, Paperclip, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -20,11 +20,16 @@ import {
   useCertificationList,
   useCreateCertification,
   useDeleteCertification,
+  useRemoveCertificationAttachment,
   useUpdateCertification,
+  useUploadCertificationAttachment,
 } from "@/features/profile/hooks/use-certifications";
 import { type CertificationFormValues, certificationSchema } from "@/features/profile/schemas";
 import type { Certification } from "@/features/profile/types";
 import { ApiError } from "@/services/api-client";
+
+const MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_ATTACHMENT_TYPES = new Set(["image/jpeg", "image/png", "application/pdf"]);
 
 const emptyValues: CertificationFormValues = {
   name: "",
@@ -87,24 +92,122 @@ function CertificationCard({ item, onEdit }: { item: Certification; onEdit: () =
   };
 
   return (
-    <div className="flex items-start justify-between rounded-lg border p-3">
-      <div>
-        <p className="font-medium">{item.name}</p>
-        <p className="text-sm text-muted-foreground">{item.issuing_organization}</p>
-        <p className="text-xs text-muted-foreground">
-          {[item.issue_date, item.expiration_date && `expires ${item.expiration_date}`]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
+    <div className="flex flex-col gap-2 rounded-lg border p-3">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="font-medium">{item.name}</p>
+          <p className="text-sm text-muted-foreground">{item.issuing_organization}</p>
+          <p className="text-xs text-muted-foreground">
+            {[item.issue_date, item.expiration_date && `expires ${item.expiration_date}`]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        </div>
+        <div className="flex gap-1">
+          <Button variant="ghost" size="icon" onClick={onEdit} aria-label="Edit">
+            <Pencil className="size-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={handleDelete} aria-label="Delete">
+            <Trash2 className="size-4" />
+          </Button>
+        </div>
       </div>
-      <div className="flex gap-1">
-        <Button variant="ghost" size="icon" onClick={onEdit} aria-label="Edit">
-          <Pencil className="size-4" />
+      <CertificationAttachment item={item} />
+    </div>
+  );
+}
+
+function CertificationAttachment({ item }: { item: Certification }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const uploadAttachment = useUploadCertificationAttachment();
+  const removeAttachment = useRemoveCertificationAttachment();
+  const isPending = uploadAttachment.isPending || removeAttachment.isPending;
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!ALLOWED_ATTACHMENT_TYPES.has(file.type)) {
+      toast.error("Attachment must be a JPG, PNG, or PDF file.");
+      return;
+    }
+    if (file.size > MAX_ATTACHMENT_SIZE_BYTES) {
+      toast.error("Attachment must be 10MB or smaller.");
+      return;
+    }
+
+    uploadAttachment.mutate(
+      { id: item.id, file },
+      {
+        onSuccess: () => toast.success("Attachment uploaded."),
+        onError: (error) => {
+          toast.error(error instanceof ApiError ? error.message : "Failed to upload attachment.");
+        },
+      },
+    );
+  };
+
+  const handleRemove = () => {
+    removeAttachment.mutate(item.id, {
+      onSuccess: () => toast.success("Attachment removed."),
+      onError: () => toast.error("Failed to remove attachment."),
+    });
+  };
+
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,application/pdf"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+      {item.file_id ? (
+        <>
+          <Paperclip className="size-4 text-muted-foreground" />
+          <a
+            href={`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1"}/files/${item.file_id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-primary underline"
+          >
+            View attachment
+          </a>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-6"
+            disabled={isPending}
+            onClick={handleRemove}
+            aria-label="Remove attachment"
+          >
+            {removeAttachment.isPending ? (
+              <Loader2 className="size-3 animate-spin" />
+            ) : (
+              <X className="size-3" />
+            )}
+          </Button>
+        </>
+      ) : (
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="h-auto p-0"
+          disabled={isPending}
+          onClick={() => inputRef.current?.click()}
+        >
+          {uploadAttachment.isPending ? (
+            <Loader2 className="size-3 animate-spin" />
+          ) : (
+            <Paperclip className="size-3" />
+          )}
+          Attach credential file
         </Button>
-        <Button variant="ghost" size="icon" onClick={handleDelete} aria-label="Delete">
-          <Trash2 className="size-4" />
-        </Button>
-      </div>
+      )}
     </div>
   );
 }

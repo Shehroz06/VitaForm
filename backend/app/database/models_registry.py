@@ -12,6 +12,7 @@ from features.certifications import models as certifications_models  # noqa: F40
 from features.competitions import models as competitions_models  # noqa: F401
 from features.education import models as education_models  # noqa: F401
 from features.experience import models as experience_models  # noqa: F401
+from features.files import models as files_models  # noqa: F401
 from features.hackathons import models as hackathons_models  # noqa: F401
 from features.languages import models as languages_models  # noqa: F401
 from features.leadership_roles import models as leadership_roles_models  # noqa: F401

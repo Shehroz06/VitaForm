@@ -8,6 +8,7 @@ from features.certifications.router import router as certifications_router
 from features.competitions.router import router as competitions_router
 from features.education.router import router as education_router
 from features.experience.router import router as experience_router
+from features.files.router import router as files_router
 from features.hackathons.router import router as hackathons_router
 from features.languages.router import router as languages_router
 from features.leadership_roles.router import router as leadership_roles_router
@@ -28,6 +29,7 @@ api_v1_router.include_router(education_router)
 api_v1_router.include_router(experience_router)
 api_v1_router.include_router(projects_router)
 api_v1_router.include_router(skills_router)
+api_v1_router.include_router(files_router)
 api_v1_router.include_router(achievements_router)
 api_v1_router.include_router(certifications_router)
 api_v1_router.include_router(awards_router)

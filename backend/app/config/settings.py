@@ -26,6 +26,19 @@ class Settings(BaseSettings):
     email_verification_token_expires_hours: int = 24
     password_reset_token_expires_hours: int = 1
 
+    api_base_url: str = "http://localhost:8000/api/v1"
+
+    storage_provider: str = "local"
+    storage_local_path: str = "storage/local"
+    max_avatar_size_mb: int = 5
+    max_attachment_size_mb: int = 10
+
+    s3_bucket: str | None = None
+    s3_region: str = "auto"
+    s3_endpoint_url: str | None = None
+    s3_access_key_id: str | None = None
+    s3_secret_access_key: str | None = None
+
 
 @lru_cache
 def get_settings() -> Settings:

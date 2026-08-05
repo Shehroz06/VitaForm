@@ -55,6 +55,7 @@ class CertificationResponse(BaseModel):
     expiration_date: date | None
     credential_id: str | None
     credential_url: str | None
+    file_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
 

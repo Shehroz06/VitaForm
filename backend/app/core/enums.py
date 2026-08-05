@@ -44,3 +44,9 @@ class PatentStatus(StrEnum):
     PENDING = "pending"
     GRANTED = "granted"
     REJECTED = "rejected"
+
+
+class FilePurpose(StrEnum):
+    AVATAR = "avatar"
+    CERTIFICATE = "certificate"
+    ACHIEVEMENT = "achievement"

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { AvatarUpload } from "@/features/profile/components/AvatarUpload";
 import { useUpdateProfile } from "@/features/profile/hooks/use-profile";
 import { type ProfileBasicsFormValues, profileBasicsSchema } from "@/features/profile/schemas";
 import type { Profile } from "@/features/profile/types";
@@ -43,6 +44,7 @@ export function ProfileBasicsForm({ profile }: { profile: Profile }) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <AvatarUpload profile={profile} />
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="headline">Headline</Label>

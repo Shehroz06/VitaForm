@@ -1,9 +1,11 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, UploadFile, status
+from fastapi import File as FileParam
 
 from app.core.base_crud import BaseOwnedCrudService
+from app.core.enums import FilePurpose
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
 from app.schemas.response import MessageResponse, SuccessResponse
 from features.certifications.dependencies import get_certification_service
@@ -13,6 +15,8 @@ from features.certifications.schemas import (
     CertificationResponse,
     CertificationUpdateRequest,
 )
+from features.files.dependencies import get_file_upload_service
+from features.files.service import FileUploadService
 from features.profiles.dependencies import CurrentProfile
 
 router = APIRouter(prefix="/certifications", tags=["certifications"])
@@ -20,6 +24,7 @@ router = APIRouter(prefix="/certifications", tags=["certifications"])
 CertificationServiceDep = Annotated[
     BaseOwnedCrudService[Certification], Depends(get_certification_service)
 ]
+FileUploadServiceDep = Annotated[FileUploadService, Depends(get_file_upload_service)]
 
 
 @router.get("", response_model=SuccessResponse[list[CertificationResponse]])
@@ -95,4 +100,42 @@ async def delete_certification(
     await service.delete_owned(certification_id, profile.id)
     return SuccessResponse(
         message="Certification deleted successfully.", data=MessageResponse(message="Deleted.")
+    )
+
+
+@router.post(
+    "/{certification_id}/attachment", response_model=SuccessResponse[CertificationResponse]
+)
+async def upload_certification_attachment(
+    certification_id: uuid.UUID,
+    profile: CurrentProfile,
+    service: CertificationServiceDep,
+    file_service: FileUploadServiceDep,
+    file: Annotated[UploadFile, FileParam()],
+) -> SuccessResponse[CertificationResponse]:
+    certification = await service.get_owned(certification_id, profile.id)
+    if certification.file_id is not None:
+        await file_service.delete(certification.file_id, profile.id)
+
+    uploaded = await file_service.upload(profile.id, FilePurpose.CERTIFICATE, file)
+    entity = await service.update_owned(certification_id, profile.id, file_id=uploaded.id)
+    return SuccessResponse(
+        message="Attachment uploaded successfully.",
+        data=CertificationResponse.model_validate(entity),
+    )
+
+
+@router.delete("/{certification_id}/attachment", response_model=SuccessResponse[MessageResponse])
+async def delete_certification_attachment(
+    certification_id: uuid.UUID,
+    profile: CurrentProfile,
+    service: CertificationServiceDep,
+    file_service: FileUploadServiceDep,
+) -> SuccessResponse[MessageResponse]:
+    certification = await service.get_owned(certification_id, profile.id)
+    if certification.file_id is not None:
+        await file_service.delete(certification.file_id, profile.id)
+        await service.update_owned(certification_id, profile.id, file_id=None)
+    return SuccessResponse(
+        message="Attachment removed successfully.", data=MessageResponse(message="Deleted.")
     )

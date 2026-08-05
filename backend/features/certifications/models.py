@@ -17,3 +17,4 @@ class Certification(CrudModelMixin, Base):
     expiration_date: Mapped[date | None] = mapped_column(default=None)
     credential_id: Mapped[str | None] = mapped_column(String(150), default=None)
     credential_url: Mapped[str | None] = mapped_column(String(500), default=None)
+    file_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("files.id"), default=None)

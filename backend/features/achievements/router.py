@@ -1,9 +1,11 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, UploadFile, status
+from fastapi import File as FileParam
 
 from app.core.base_crud import BaseOwnedCrudService
+from app.core.enums import FilePurpose
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
 from app.schemas.response import MessageResponse, SuccessResponse
 from features.achievements.dependencies import get_achievement_service
@@ -13,6 +15,8 @@ from features.achievements.schemas import (
     AchievementResponse,
     AchievementUpdateRequest,
 )
+from features.files.dependencies import get_file_upload_service
+from features.files.service import FileUploadService
 from features.profiles.dependencies import CurrentProfile
 
 router = APIRouter(prefix="/achievements", tags=["achievements"])
@@ -20,6 +24,7 @@ router = APIRouter(prefix="/achievements", tags=["achievements"])
 AchievementServiceDep = Annotated[
     BaseOwnedCrudService[Achievement], Depends(get_achievement_service)
 ]
+FileUploadServiceDep = Annotated[FileUploadService, Depends(get_file_upload_service)]
 
 
 @router.get("", response_model=SuccessResponse[list[AchievementResponse]])
@@ -95,4 +100,40 @@ async def delete_achievement(
     await service.delete_owned(achievement_id, profile.id)
     return SuccessResponse(
         message="Achievement deleted successfully.", data=MessageResponse(message="Deleted.")
+    )
+
+
+@router.post("/{achievement_id}/attachment", response_model=SuccessResponse[AchievementResponse])
+async def upload_achievement_attachment(
+    achievement_id: uuid.UUID,
+    profile: CurrentProfile,
+    service: AchievementServiceDep,
+    file_service: FileUploadServiceDep,
+    file: Annotated[UploadFile, FileParam()],
+) -> SuccessResponse[AchievementResponse]:
+    achievement = await service.get_owned(achievement_id, profile.id)
+    if achievement.file_id is not None:
+        await file_service.delete(achievement.file_id, profile.id)
+
+    uploaded = await file_service.upload(profile.id, FilePurpose.ACHIEVEMENT, file)
+    entity = await service.update_owned(achievement_id, profile.id, file_id=uploaded.id)
+    return SuccessResponse(
+        message="Attachment uploaded successfully.",
+        data=AchievementResponse.model_validate(entity),
+    )
+
+
+@router.delete("/{achievement_id}/attachment", response_model=SuccessResponse[MessageResponse])
+async def delete_achievement_attachment(
+    achievement_id: uuid.UUID,
+    profile: CurrentProfile,
+    service: AchievementServiceDep,
+    file_service: FileUploadServiceDep,
+) -> SuccessResponse[MessageResponse]:
+    achievement = await service.get_owned(achievement_id, profile.id)
+    if achievement.file_id is not None:
+        await file_service.delete(achievement.file_id, profile.id)
+        await service.update_owned(achievement_id, profile.id, file_id=None)
+    return SuccessResponse(
+        message="Attachment removed successfully.", data=MessageResponse(message="Deleted.")
     )

@@ -32,7 +32,7 @@ next-env.d.ts
 *.pid
 
 # --- Storage (local dev uploads) ---
-storage/local/
+backend/storage/local/
 
 # --- OS / editor ---
 .DS_Store

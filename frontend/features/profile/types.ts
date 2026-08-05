@@ -130,11 +130,15 @@ export interface Achievement {
   issuer: string | null;
   date_achieved: string | null;
   description: string | null;
+  file_id: string | null;
   created_at: string;
   updated_at: string;
 }
 
-export type AchievementPayload = Omit<Achievement, "id" | "created_at" | "updated_at">;
+export type AchievementPayload = Omit<
+  Achievement,
+  "id" | "file_id" | "created_at" | "updated_at"
+>;
 
 export interface Certification {
   id: string;
@@ -144,11 +148,27 @@ export interface Certification {
   expiration_date: string | null;
   credential_id: string | null;
   credential_url: string | null;
+  file_id: string | null;
   created_at: string;
   updated_at: string;
 }
 
-export type CertificationPayload = Omit<Certification, "id" | "created_at" | "updated_at">;
+export type CertificationPayload = Omit<
+  Certification,
+  "id" | "file_id" | "created_at" | "updated_at"
+>;
+
+export type FilePurpose = "avatar" | "certificate" | "achievement";
+
+export interface FileAttachment {
+  id: string;
+  purpose: FilePurpose;
+  original_filename: string;
+  content_type: string;
+  size_bytes: number;
+  url: string;
+  created_at: string;
+}
 
 export interface Award {
   id: string;

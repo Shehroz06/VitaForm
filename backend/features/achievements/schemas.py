@@ -24,6 +24,7 @@ class AchievementResponse(BaseModel):
     issuer: str | None
     date_achieved: date | None
     description: str | None
+    file_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
 
