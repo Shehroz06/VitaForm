@@ -1,7 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createCrudHooks } from "@/features/profile/hooks/use-crud-resource";
 import { resumeService, resumeTemplateService } from "@/features/resumes/services/resume-service";
-import type { Resume, ResumeCreatePayload } from "@/features/resumes/types";
+import type { Resume, ResumeCreatePayload, ResumeGeneratePayload } from "@/features/resumes/types";
 
 export const {
   useList: useResumeList,
@@ -20,4 +20,12 @@ export function useResume(id: string) {
 
 export function useResumeTemplates() {
   return useQuery({ queryKey: ["resume-templates"], queryFn: resumeTemplateService.list });
+}
+
+export function useGenerateResume() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ResumeGeneratePayload) => resumeService.generate(payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["resumes"] }),
+  });
 }

@@ -7,6 +7,9 @@ from app.dependencies.auth import CurrentUser
 from app.exceptions.base import ResourceNotFoundException
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
 from app.schemas.response import MessageResponse, SuccessResponse
+from features.ai.dependencies import get_generation_service
+from features.ai.schemas import ResumeGenerateRequest
+from features.ai.service import GenerationService
 from features.files.dependencies import get_file_repository
 from features.files.repository import FileRepository
 from features.files.schemas import FileResponse as FileAttachmentResponse
@@ -37,6 +40,7 @@ ResumeExportServiceDep = Annotated[ResumeExportService, Depends(get_resume_expor
 ResumeTemplateRepositoryDep = Annotated[
     ResumeTemplateRepository, Depends(get_resume_template_repository)
 ]
+GenerationServiceDep = Annotated[GenerationService, Depends(get_generation_service)]
 
 
 async def _to_resume_response(resume: Resume, service: ResumeService) -> ResumeResponse:
@@ -89,6 +93,27 @@ async def create_resume(
     resume = await service.create_resume(profile.id, data.title, data.template_id)
     return SuccessResponse(
         message="Resume created successfully.", data=await _to_resume_response(resume, service)
+    )
+
+
+@router.post("/resumes/generate", response_model=SuccessResponse[FileAttachmentResponse])
+async def generate_resume(
+    data: ResumeGenerateRequest,
+    profile: CurrentProfile,
+    user: CurrentUser,
+    generation_service: GenerationServiceDep,
+    file_repository: Annotated[FileRepository, Depends(get_file_repository)],
+) -> SuccessResponse[FileAttachmentResponse]:
+    version = await generation_service.generate_resume(profile, user.email, data)
+
+    assert version.rendered_file_id is not None
+    rendered_file = await file_repository.get_by_id(version.rendered_file_id)
+    if rendered_file is None:
+        raise ResourceNotFoundException("Rendered resume file not found.")
+
+    return SuccessResponse(
+        message="Resume generated successfully.",
+        data=FileAttachmentResponse.model_validate(rendered_file),
     )
 
 

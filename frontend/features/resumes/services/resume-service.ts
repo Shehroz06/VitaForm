@@ -3,6 +3,7 @@ import type {
   Resume,
   ResumeContent,
   ResumeCreatePayload,
+  ResumeGeneratePayload,
   ResumeTemplate,
   ResumeUpdatePayload,
   ResumeVersion,
@@ -17,6 +18,8 @@ export const resumeTemplateService = {
 export const resumeService = {
   list: () => apiClient.get<Resume[]>("/resumes"),
   create: (payload: ResumeCreatePayload) => apiClient.post<Resume>("/resumes", payload),
+  generate: (payload: ResumeGeneratePayload) =>
+    apiClient.post<ExportedResumeFile>("/resumes/generate", payload),
   get: (id: string) => apiClient.get<Resume>(`/resumes/${id}`),
   update: (id: string, payload: Partial<ResumeUpdatePayload>) =>
     apiClient.patch<Resume>(`/resumes/${id}`, payload),

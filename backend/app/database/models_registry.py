@@ -6,6 +6,7 @@ they're built.
 """
 
 from features.achievements import models as achievements_models  # noqa: F401
+from features.ai import models as ai_models  # noqa: F401
 from features.auth import models as auth_models  # noqa: F401
 from features.awards import models as awards_models  # noqa: F401
 from features.certifications import models as certifications_models  # noqa: F401

@@ -82,3 +82,11 @@ export interface ExportedResumeFile {
   url: string;
   created_at: string;
 }
+
+export interface ResumeGeneratePayload {
+  title?: string | null;
+  template_id: string;
+  job_description: string;
+  target_role?: string | null;
+  target_company?: string | null;
+}

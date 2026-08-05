@@ -29,17 +29,26 @@ class ResumeService:
         self._templates = template_repository
 
     async def create_resume(
-        self, profile_id: uuid.UUID, title: str, template_id: uuid.UUID
+        self,
+        profile_id: uuid.UUID,
+        title: str,
+        template_id: uuid.UUID,
+        content: ResumeContent | None = None,
     ) -> Resume:
         template = await self._templates.get_by_id(template_id)
         if template is None or not template.is_active:
             raise ValidationException("Selected template is not available.")
 
+        if content is not None:
+            await self._validate_item_ownership(profile_id, content)
+
         resume = await self._resumes.create(
             profile_id=profile_id, template_id=template_id, title=title
         )
         await self._versions.create_version(
-            resume.id, version_number=1, content=ResumeContent().model_dump(mode="json")
+            resume.id,
+            version_number=1,
+            content=(content or ResumeContent()).model_dump(mode="json"),
         )
         return resume
 

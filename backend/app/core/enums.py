@@ -68,3 +68,8 @@ class SectionType(StrEnum):
     CERTIFICATIONS = "certifications"
     ACHIEVEMENTS = "achievements"
     AWARDS = "awards"
+
+
+class GenerationStatus(StrEnum):
+    SUCCESS = "success"
+    FAILED = "failed"
