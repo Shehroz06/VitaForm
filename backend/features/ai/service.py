@@ -144,9 +144,9 @@ class GenerationService:
 
     def _provider_order(self) -> list[str]:
         order = [self._settings.ai_default_provider]
-        fallback = self._settings.ai_fallback_provider
-        if fallback and fallback != self._settings.ai_default_provider:
-            order.append(fallback)
+        for name in self._settings.ai_fallback_providers:
+            if name not in order:
+                order.append(name)
         return order
 
     async def _run_provider_attempts(

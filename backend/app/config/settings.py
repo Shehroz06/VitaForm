@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     jwt_refresh_token_expires_days: int = 30
 
     ai_default_provider: str = "gemini"
-    ai_fallback_provider: str | None = "anthropic"
+    ai_fallback_providers: list[str] = ["groq", "anthropic", "openrouter"]
     ai_max_retries: int = 2
 
     anthropic_api_key: str | None = None
@@ -27,10 +27,10 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
 
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-flash-latest"
 
     openrouter_api_key: str | None = None
-    openrouter_model: str = "meta-llama/llama-3.3-70b-instruct:free"
+    openrouter_model: str = "inclusionai/ling-3.0-flash:free"
 
     groq_api_key: str | None = None
     groq_model: str = "llama-3.3-70b-versatile"

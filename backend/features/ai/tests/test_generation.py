@@ -2,6 +2,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.ai_provider import ProviderNotConfiguredError
 from features.ai.models import AIProviderLog, GenerationHistory
 from features.ai.tests.support import FakeAIProvider
 from tests.support import auth_headers, create_verified_user_and_login
@@ -59,6 +60,8 @@ async def _seed_profile_data(client: AsyncClient, headers: dict[str, str]) -> No
 
 def _patch_providers(monkeypatch, providers: dict[str, FakeAIProvider]) -> None:
     def _fake_build_provider(name: str, settings: object) -> FakeAIProvider:
+        if name not in providers:
+            raise ProviderNotConfiguredError(f"{name.upper()}_API_KEY is not set.")
         return providers[name]
 
     monkeypatch.setattr("features.ai.service.build_provider", _fake_build_provider)
