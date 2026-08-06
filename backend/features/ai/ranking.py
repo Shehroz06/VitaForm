@@ -22,6 +22,9 @@ _STOPWORDS = frozenset(
     they their he she his her i me my will would should could can may
     must have has had do does did not no yes about into over under than
     then so such also more most other some any all each every no nor
+    experience years strong requirements required preferred required
+    qualifications ability able looking join team role work working
+    knowledge familiarity understanding skills good great excellent
     """.split()
 )
 _WORD_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9+#.]{1,}")

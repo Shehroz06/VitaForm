@@ -27,31 +27,45 @@ import { ApiError } from "@/services/api-client";
 
 const MIN_JOB_DESCRIPTION_LENGTH = 50;
 
-export function GenerateResumeDialog() {
+export interface GenerateResumeInitialValues {
+  jobDescription?: string;
+  targetRole?: string;
+  targetCompany?: string;
+}
+
+export function GenerateResumeDialog({
+  autoOpen = false,
+  initialValues,
+}: {
+  autoOpen?: boolean;
+  initialValues?: GenerateResumeInitialValues;
+}) {
   const { data: templates } = useResumeTemplates();
   const generateResume = useGenerateResume();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(autoOpen);
   const [templateId, setTemplateId] = useState("");
-  const [jobDescription, setJobDescription] = useState("");
-  const [targetRole, setTargetRole] = useState("");
-  const [targetCompany, setTargetCompany] = useState("");
+  const [jobDescription, setJobDescription] = useState(initialValues?.jobDescription ?? "");
+  const [targetRole, setTargetRole] = useState(initialValues?.targetRole ?? "");
+  const [targetCompany, setTargetCompany] = useState(initialValues?.targetCompany ?? "");
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
     if (next) {
       setTemplateId(templates?.[0]?.id ?? "");
-      setJobDescription("");
-      setTargetRole("");
-      setTargetCompany("");
+      setJobDescription(initialValues?.jobDescription ?? "");
+      setTargetRole(initialValues?.targetRole ?? "");
+      setTargetCompany(initialValues?.targetCompany ?? "");
     }
   };
 
+  const effectiveTemplateId = templateId || templates?.[0]?.id || "";
+
   const handleGenerate = () => {
-    if (!templateId || jobDescription.trim().length < MIN_JOB_DESCRIPTION_LENGTH) return;
+    if (!effectiveTemplateId || jobDescription.trim().length < MIN_JOB_DESCRIPTION_LENGTH) return;
 
     generateResume.mutate(
       {
-        template_id: templateId,
+        template_id: effectiveTemplateId,
         job_description: jobDescription.trim(),
         target_role: targetRole.trim() || null,
         target_company: targetCompany.trim() || null,
@@ -107,7 +121,7 @@ export function GenerateResumeDialog() {
           </div>
           <div className="flex flex-col gap-1.5">
             <Label>Template</Label>
-            <Select value={templateId} onValueChange={setTemplateId}>
+            <Select value={effectiveTemplateId} onValueChange={setTemplateId}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Choose a template" />
               </SelectTrigger>
@@ -139,7 +153,7 @@ export function GenerateResumeDialog() {
         <DialogFooter>
           <Button
             onClick={handleGenerate}
-            disabled={generateResume.isPending || !templateId || isJobDescriptionTooShort}
+            disabled={generateResume.isPending || !effectiveTemplateId || isJobDescriptionTooShort}
           >
             {generateResume.isPending ? "Generating... this can take up to a minute" : "Generate"}
           </Button>

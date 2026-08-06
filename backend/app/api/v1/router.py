@@ -10,6 +10,7 @@ from features.education.router import router as education_router
 from features.experience.router import router as experience_router
 from features.files.router import router as files_router
 from features.hackathons.router import router as hackathons_router
+from features.jobs.router import router as jobs_router
 from features.languages.router import router as languages_router
 from features.leadership_roles.router import router as leadership_roles_router
 from features.organizations.router import router as organizations_router
@@ -44,3 +45,4 @@ api_v1_router.include_router(references_router)
 api_v1_router.include_router(hackathons_router)
 api_v1_router.include_router(competitions_router)
 api_v1_router.include_router(patents_router)
+api_v1_router.include_router(jobs_router)
