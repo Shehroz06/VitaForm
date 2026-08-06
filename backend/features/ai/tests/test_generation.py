@@ -64,7 +64,7 @@ def _patch_providers(monkeypatch, providers: dict[str, FakeAIProvider]) -> None:
             raise ProviderNotConfiguredError(f"{name.upper()}_API_KEY is not set.")
         return providers[name]
 
-    monkeypatch.setattr("features.ai.service.build_provider", _fake_build_provider)
+    monkeypatch.setattr("features.ai.provider_runner.build_provider", _fake_build_provider)
 
 
 async def test_generate_resume_happy_path(

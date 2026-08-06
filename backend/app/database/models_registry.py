@@ -10,6 +10,7 @@ from features.ai import models as ai_models  # noqa: F401
 from features.auth import models as auth_models  # noqa: F401
 from features.awards import models as awards_models  # noqa: F401
 from features.certifications import models as certifications_models  # noqa: F401
+from features.companion import models as companion_models  # noqa: F401
 from features.competitions import models as competitions_models  # noqa: F401
 from features.education import models as education_models  # noqa: F401
 from features.experience import models as experience_models  # noqa: F401

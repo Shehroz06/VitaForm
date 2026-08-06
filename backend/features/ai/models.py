@@ -36,6 +36,16 @@ class GenerationHistory(CrudModelMixin, Base):
     resume_version_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("resume_versions.id"), default=None
     )
+    # Same nullable-target convention as resume_id/resume_version_id above,
+    # extended for Phase 8's two additional document types. A polymorphic
+    # single "target" column would be more elegant past 3-4 document types,
+    # but isn't worth the complexity yet.
+    cover_letter_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("cover_letters.id"), default=None
+    )
+    linkedin_generation_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("linkedin_generations.id"), default=None
+    )
     prompt_history_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("prompt_history.id"))
     status: Mapped[GenerationStatus] = mapped_column(
         pg_enum(GenerationStatus, name="generation_status")

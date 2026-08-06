@@ -31,6 +31,12 @@ export default function DashboardPage() {
         <Button asChild variant="secondary">
           <Link href="/jobs">Jobs</Link>
         </Button>
+        <Button asChild variant="secondary">
+          <Link href="/cover-letters">Cover Letters</Link>
+        </Button>
+        <Button asChild variant="secondary">
+          <Link href="/linkedin">LinkedIn</Link>
+        </Button>
         <Button variant="outline" onClick={handleLogout} disabled={logout.isPending}>
           {logout.isPending ? "Logging out..." : "Log out"}
         </Button>

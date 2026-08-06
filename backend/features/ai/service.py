@@ -1,14 +1,11 @@
-import uuid
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.config.settings import Settings
-from app.core.ai_provider import ProviderNotConfiguredError, build_provider
 from app.core.enums import GenerationStatus, SectionType
 from app.exceptions.base import BusinessRuleException
+from features.ai.candidates import load_candidate_items
 from features.ai.context_builder import build_candidates
 from features.ai.prompts import (
     RESUME_GENERATION_PURPOSE,
@@ -16,6 +13,7 @@ from features.ai.prompts import (
     RESUME_GENERATION_VERSION,
     build_resume_generation_prompt,
 )
+from features.ai.provider_runner import run_with_fallback
 from features.ai.ranking import extract_keywords, rank_and_select
 from features.ai.repository import (
     AIProviderLogRepository,
@@ -23,13 +21,11 @@ from features.ai.repository import (
     PromptHistoryRepository,
 )
 from features.ai.schemas import AIResumeResponse, ResumeGenerateRequest
-from features.ai.validator import AIResponseValidationError, validate_ai_response
+from features.ai.validator import validate_ai_response
 from features.profiles.models import Profile
-from features.projects.models import Project
 from features.resumes.export_service import ResumeExportService
 from features.resumes.models import Resume, ResumeVersion
 from features.resumes.schemas import ContactVisibility, ResumeContent, ResumeSection
-from features.resumes.section_registry import SECTION_MODELS
 from features.resumes.service import ResumeService
 
 _RESUME_TEMPERATURE = 0.2
@@ -77,7 +73,7 @@ class GenerationService:
     async def generate_resume(
         self, profile: Profile, user_email: str, request: ResumeGenerateRequest
     ) -> ResumeVersion:
-        items_by_type = await self._load_candidate_items(profile.id)
+        items_by_type = await load_candidate_items(self._db, profile.id)
         keywords = extract_keywords(request.job_description)
         ranked = rank_and_select(items_by_type, keywords)
         candidates_by_type = build_candidates(ranked)
@@ -96,14 +92,19 @@ class GenerationService:
             RESUME_GENERATION_PURPOSE, RESUME_GENERATION_VERSION, RESUME_GENERATION_SYSTEM_PROMPT
         )
 
-        ai_response, used_provider, attempt_logs, error_message = await self._run_provider_attempts(
-            user_prompt, candidate_ids_by_section
+        run_result = await run_with_fallback(
+            self._settings,
+            RESUME_GENERATION_SYSTEM_PROMPT,
+            user_prompt,
+            temperature=_RESUME_TEMPERATURE,
+            max_tokens=_MAX_OUTPUT_TOKENS,
+            validate=lambda text: validate_ai_response(text, candidate_ids_by_section),
         )
 
-        if ai_response is None:
+        if run_result.value is None:
             await self._record_generation(
-                None, profile, prompt_history, GenerationStatus.FAILED, None, None, error_message,
-                attempt_logs,
+                None, profile, prompt_history, GenerationStatus.FAILED, None, None,
+                run_result.error_message, run_result.attempt_logs,
             )
             # Commit the failure log explicitly: the exception raised below
             # triggers a rollback in get_db's error handling, which would
@@ -113,7 +114,7 @@ class GenerationService:
                 "AI resume generation is temporarily unavailable. Please try again shortly."
             )
 
-        content = self._to_resume_content(ai_response)
+        content = self._to_resume_content(run_result.value)
         title = request.title or (
             f"AI Resume — {request.target_role or request.target_company or 'Untitled'}"
         )
@@ -123,85 +124,11 @@ class GenerationService:
         version = await self._resume_service.get_latest_version(resume)
 
         await self._record_generation(
-            resume, profile, prompt_history, GenerationStatus.SUCCESS, version, used_provider,
-            None, attempt_logs,
+            resume, profile, prompt_history, GenerationStatus.SUCCESS, version,
+            run_result.provider, None, run_result.attempt_logs,
         )
         await self._export_service.export(resume, version, profile, user_email)
         return version
-
-    async def _load_candidate_items(self, profile_id: uuid.UUID) -> dict[SectionType, list[Any]]:
-        result: dict[SectionType, list[Any]] = {}
-        for section_type, model in SECTION_MODELS.items():
-            stmt = select(model).where(
-                model.profile_id == profile_id,  # type: ignore[attr-defined]
-                model.deleted_at.is_(None),
-            )
-            if model is Project:
-                stmt = stmt.options(selectinload(Project.skills))
-            items = (await self._db.execute(stmt)).scalars().all()
-            result[section_type] = list(items)
-        return result
-
-    def _provider_order(self) -> list[str]:
-        order = [self._settings.ai_default_provider]
-        for name in self._settings.ai_fallback_providers:
-            if name not in order:
-                order.append(name)
-        return order
-
-    async def _run_provider_attempts(
-        self, user_prompt: str, candidate_ids_by_section: dict[SectionType, set[uuid.UUID]]
-    ) -> tuple[AIResumeResponse | None, str | None, list[dict[str, Any]], str | None]:
-        attempt_logs: list[dict[str, Any]] = []
-        error_message: str | None = None
-
-        for provider_name in self._provider_order():
-            try:
-                provider = build_provider(provider_name, self._settings)
-            except ProviderNotConfiguredError as exc:
-                error_message = str(exc)
-                continue
-
-            for attempt in range(self._settings.ai_max_retries + 1):
-                try:
-                    result = await provider.generate(
-                        RESUME_GENERATION_SYSTEM_PROMPT,
-                        user_prompt,
-                        temperature=_RESUME_TEMPERATURE,
-                        max_tokens=_MAX_OUTPUT_TOKENS,
-                    )
-                    ai_response = validate_ai_response(result.text, candidate_ids_by_section)
-                except (AIResponseValidationError, Exception) as exc:  # noqa: BLE001
-                    error_message = str(exc)[:2000]
-                    attempt_logs.append(
-                        {
-                            "provider": provider_name,
-                            "model": getattr(provider, "model", ""),
-                            "latency_ms": 0,
-                            "prompt_tokens": 0,
-                            "completion_tokens": 0,
-                            "retry_attempt": attempt,
-                            "success": False,
-                            "error_message": error_message,
-                        }
-                    )
-                    continue
-                else:
-                    attempt_logs.append(
-                        {
-                            "provider": result.provider,
-                            "model": result.model,
-                            "latency_ms": result.latency_ms,
-                            "prompt_tokens": result.prompt_tokens,
-                            "completion_tokens": result.completion_tokens,
-                            "retry_attempt": attempt,
-                            "success": True,
-                            "error_message": None,
-                        }
-                    )
-                    return ai_response, provider_name, attempt_logs, None
-
-        return None, None, attempt_logs, error_message
 
     async def _record_generation(
         self,

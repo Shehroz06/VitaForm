@@ -5,6 +5,7 @@ from features.achievements.router import router as achievements_router
 from features.auth.router import router as auth_router
 from features.awards.router import router as awards_router
 from features.certifications.router import router as certifications_router
+from features.companion.router import router as companion_router
 from features.competitions.router import router as competitions_router
 from features.education.router import router as education_router
 from features.experience.router import router as experience_router
@@ -46,3 +47,4 @@ api_v1_router.include_router(hackathons_router)
 api_v1_router.include_router(competitions_router)
 api_v1_router.include_router(patents_router)
 api_v1_router.include_router(jobs_router)
+api_v1_router.include_router(companion_router)
