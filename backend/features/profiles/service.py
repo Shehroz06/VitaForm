@@ -2,6 +2,7 @@ import uuid
 from typing import Any
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from features.education.models import Education
@@ -24,7 +25,20 @@ class ProfileService:
         profile = await self._repository.get_by_user_id(user_id)
         if profile is not None:
             return profile
-        return await self._repository.create(user_id=user_id)
+        try:
+            return await self._repository.create(user_id=user_id)
+        except IntegrityError:
+            # Lost a race against a concurrent request creating the same
+            # user's profile (e.g. several dashboard requests resolving
+            # `CurrentProfile` in parallel right after login) -- the flush
+            # above leaves the session's transaction unusable until rolled
+            # back, after which the row the other request committed is
+            # visible to re-fetch.
+            await self._db.rollback()
+            profile = await self._repository.get_by_user_id(user_id)
+            if profile is not None:
+                return profile
+            raise
 
     async def update(self, user_id: uuid.UUID, **values: Any) -> Profile:
         profile = await self.get_or_create(user_id)
