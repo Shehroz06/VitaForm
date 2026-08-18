@@ -54,6 +54,13 @@ class AuthRepository:
         await self._db.flush()
         return user
 
+    async def update_user_name(
+        self, user: User, first_name: str | None, last_name: str | None
+    ) -> None:
+        user.first_name = first_name
+        user.last_name = last_name
+        await self._db.flush()
+
     async def update_user_password(self, user: User, password_hash: str) -> None:
         user.password_hash = password_hash
         await self._db.flush()

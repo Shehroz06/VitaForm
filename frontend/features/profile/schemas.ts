@@ -7,8 +7,8 @@ const url = z
   .or(z.literal(""));
 
 export const profileBasicsSchema = z.object({
-  headline: z.string().max(150).optional().or(z.literal("")),
-  bio: z.string().max(2000).optional().or(z.literal("")),
+  first_name: z.string().max(100).optional().or(z.literal("")),
+  last_name: z.string().max(100).optional().or(z.literal("")),
   phone: z.string().max(30).optional().or(z.literal("")),
   location: z.string().max(150).optional().or(z.literal("")),
   website_url: url,

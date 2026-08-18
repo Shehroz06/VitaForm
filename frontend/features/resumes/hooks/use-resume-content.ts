@@ -22,6 +22,19 @@ export function useUpdateResumeContent(resumeId: string) {
   });
 }
 
+/**
+ * Updates the current version's content in place (no new version row) --
+ * the debounced autosave path, distinct from useUpdateResumeContent's
+ * explicit "save a checkpoint" behavior. No query invalidation: the local
+ * builder state that was just persisted is already the source of truth on
+ * screen, so there's nothing to refetch.
+ */
+export function useAutosaveResumeContent(resumeId: string) {
+  return useMutation({
+    mutationFn: (content: ResumeContent) => resumeService.autosaveContent(resumeId, content),
+  });
+}
+
 export function useResumeVersions(resumeId: string) {
   return useQuery({
     queryKey: ["resumes", resumeId, "versions"],

@@ -20,7 +20,7 @@ from app.database.base import Base
 from app.database.session import get_db
 from app.main import create_app
 from features.auth.constants import DEFAULT_ROLES
-from features.resumes.constants import DEFAULT_TEMPLATES
+from features.resumes.constants import ADDITIONAL_TEMPLATES, ATS_SAFE_TEMPLATES, DEFAULT_TEMPLATES
 
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL",
@@ -74,7 +74,9 @@ async def _seed_default_resume_templates(conn: AsyncConnection) -> None:
                 "created_at": now,
                 "updated_at": now,
             }
-            for slug, name, description in DEFAULT_TEMPLATES
+            for slug, name, description in (
+                DEFAULT_TEMPLATES + ADDITIONAL_TEMPLATES + ATS_SAFE_TEMPLATES
+            )
         ],
     )
 

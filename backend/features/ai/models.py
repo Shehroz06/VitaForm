@@ -46,6 +46,9 @@ class GenerationHistory(CrudModelMixin, Base):
     linkedin_generation_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("linkedin_generations.id"), default=None
     )
+    import_session_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("import_sessions.id"), default=None
+    )
     prompt_history_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("prompt_history.id"))
     status: Mapped[GenerationStatus] = mapped_column(
         pg_enum(GenerationStatus, name="generation_status")

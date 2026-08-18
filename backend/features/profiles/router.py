@@ -12,8 +12,10 @@ from features.profiles.service import ProfileService
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
 
-async def _to_response(profile: Profile, service: ProfileService) -> ProfileResponse:
-    completion = await service.compute_completion_percentage(profile)
+async def _to_response(
+    profile: Profile, first_name: str | None, last_name: str | None, service: ProfileService
+) -> ProfileResponse:
+    completion = await service.compute_completion_percentage(profile, first_name, last_name)
     return ProfileResponse(
         id=profile.id,
         user_id=profile.user_id,
@@ -36,7 +38,8 @@ async def get_my_profile(
 ) -> SuccessResponse[ProfileResponse]:
     profile = await service.get_or_create(user.id)
     return SuccessResponse(
-        message="Profile retrieved successfully.", data=await _to_response(profile, service)
+        message="Profile retrieved successfully.",
+        data=await _to_response(profile, user.first_name, user.last_name, service),
     )
 
 
@@ -48,5 +51,6 @@ async def update_my_profile(
 ) -> SuccessResponse[ProfileResponse]:
     profile = await service.update(user.id, **data.model_dump(exclude_unset=True))
     return SuccessResponse(
-        message="Profile updated successfully.", data=await _to_response(profile, service)
+        message="Profile updated successfully.",
+        data=await _to_response(profile, user.first_name, user.last_name, service),
     )

@@ -88,7 +88,7 @@ export function JobDetail({ jobId }: { jobId: string }) {
           </p>
         )}
         {score && (
-          <div className="flex flex-col gap-3 rounded-lg border p-4">
+          <div className="flex flex-col gap-3 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-bold">{score.overall_score}</span>
               <span className="text-sm text-muted-foreground">/ 100</span>
@@ -130,7 +130,7 @@ export function JobDetail({ jobId }: { jobId: string }) {
 
       <div className="flex flex-col gap-2 border-t pt-6">
         <h2 className="text-sm font-semibold text-muted-foreground">Original job description</h2>
-        <p className="whitespace-pre-line rounded-lg border p-4 text-sm">{job.raw_text}</p>
+        <p className="whitespace-pre-line rounded-xl bg-card p-4 ring-1 ring-foreground/10 text-sm">{job.raw_text}</p>
       </div>
     </div>
   );

@@ -109,7 +109,7 @@ function ExperienceCard({ item, onEdit }: { item: Experience; onEdit: () => void
   };
 
   return (
-    <div className="flex items-start justify-between rounded-lg border p-3">
+    <div className="flex items-start justify-between rounded-xl bg-card p-3.5 ring-1 ring-foreground/10 transition-colors hover:bg-muted/40">
       <div>
         <p className="font-medium">{item.job_title}</p>
         <p className="text-sm text-muted-foreground">

@@ -61,8 +61,9 @@ def get_generation_service(
         AIProviderLogRepository, Depends(get_ai_provider_log_repository)
     ],
 ) -> GenerationService:
+    renderer = ResumeRenderer(db)
     export_service = ResumeExportService(
-        ResumeRenderer(db), version_repository, template_repository, file_service
+        renderer, version_repository, template_repository, file_service
     )
     return GenerationService(
         db,
@@ -72,4 +73,6 @@ def get_generation_service(
         prompt_history_repository,
         generation_history_repository,
         provider_log_repository,
+        renderer,
+        template_repository,
     )

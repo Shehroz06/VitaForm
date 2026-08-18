@@ -30,8 +30,10 @@ class ProfileService:
         profile = await self.get_or_create(user_id)
         return await self._repository.update(profile, **values)
 
-    async def compute_completion_percentage(self, profile: Profile) -> int:
-        has_basics = bool(profile.headline and profile.bio)
+    async def compute_completion_percentage(
+        self, profile: Profile, first_name: str | None, last_name: str | None
+    ) -> int:
+        has_basics = bool(first_name and last_name)
         education_count = await self._count(Education, profile.id)
         experience_count = await self._count(Experience, profile.id)
         project_count = await self._count(Project, profile.id)

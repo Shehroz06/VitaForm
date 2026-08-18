@@ -14,10 +14,12 @@ from features.auth.exceptions import (
     InvalidCredentialsError,
     InvalidOrExpiredTokenError,
     UserAlreadyExistsError,
+    UserNotFoundError,
 )
 from features.auth.models import User
 from features.auth.repository import AuthRepository
 from features.auth.schemas import (
+    AdminResetPasswordRequest,
     ForgotPasswordRequest,
     LoginRequest,
     RegisterRequest,
@@ -192,3 +194,21 @@ class ResetPassword:
         await self._repository.update_user_password(user, hash_password(data.new_password))
         await self._repository.mark_password_reset_token_used(token)
         await self._repository.revoke_all_sessions_for_user(user.id)
+
+
+class AdminResetPassword:
+    """Sets a user's password directly, on an admin's authority -- no reset
+    token, no email round-trip. Same end state as a normal token-based
+    reset (new hash, every existing session revoked) minus the token."""
+
+    def __init__(self, repository: AuthRepository) -> None:
+        self._repository = repository
+
+    async def execute(self, data: AdminResetPasswordRequest) -> User:
+        user = await self._repository.get_user_by_email(data.email)
+        if user is None:
+            raise UserNotFoundError
+
+        await self._repository.update_user_password(user, hash_password(data.new_password))
+        await self._repository.revoke_all_sessions_for_user(user.id)
+        return user

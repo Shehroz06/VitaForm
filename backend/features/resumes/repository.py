@@ -18,6 +18,12 @@ class ResumeTemplateRepository(BaseRepository[ResumeTemplate]):
         )
         return list((await self._db.execute(stmt)).scalars().all())
 
+    async def get_by_slug(self, slug: str) -> ResumeTemplate | None:
+        stmt = select(ResumeTemplate).where(
+            ResumeTemplate.slug == slug, ResumeTemplate.deleted_at.is_(None)
+        )
+        return (await self._db.execute(stmt)).scalar_one_or_none()
+
 
 class ResumeRepository(BaseRepository[Resume]):
     def __init__(self, db: AsyncSession) -> None:

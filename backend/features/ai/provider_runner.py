@@ -36,15 +36,20 @@ async def run_with_fallback[T](
     temperature: float,
     max_tokens: int,
     validate: Callable[[str], T],
+    images: list[bytes] | None = None,
+    providers: list[str] | None = None,
 ) -> ProviderRunResult[T]:
     """Tries each configured provider in order, retrying AI_MAX_RETRIES times
     within a provider before moving to the next one. `validate` parses and
     validates the raw response text; any exception it raises is treated the
-    same as a provider/network failure and triggers a retry."""
+    same as a provider/network failure and triggers a retry. `providers`
+    overrides the default/fallback chain from settings -- used by callers
+    that need a specific capability (e.g. vision) not every configured
+    provider has."""
     attempt_logs: list[dict[str, Any]] = []
     error_message: str | None = None
 
-    for provider_name in provider_order(settings):
+    for provider_name in (providers if providers is not None else provider_order(settings)):
         try:
             provider = build_provider(provider_name, settings)
         except ProviderNotConfiguredError as exc:
@@ -54,7 +59,11 @@ async def run_with_fallback[T](
         for attempt in range(settings.ai_max_retries + 1):
             try:
                 result = await provider.generate(
-                    system_prompt, user_prompt, temperature=temperature, max_tokens=max_tokens
+                    system_prompt,
+                    user_prompt,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    images=images,
                 )
                 value = validate(result.text)
             except Exception as exc:  # noqa: BLE001

@@ -55,10 +55,10 @@ class FilePurpose(StrEnum):
 
 class SectionType(StrEnum):
     """Resume section types. SUMMARY is free-text; the rest reference items
-    from the matching profile sub-resource by id. Deliberately scoped to the
-    most common resume sections for Phase 5 -- the remaining profile modules
-    (research, volunteer work, languages, etc.) use the exact same shape and
-    can be added to SECTION_REGISTRY later without a schema change."""
+    from the matching profile sub-resource by id. All sections are optional
+    and selected per-resume -- inclusion depends on what the user picks and
+    what fits the CV they're building (e.g. Research/Patents suit an
+    academic CV, Hackathons/Competitions suit an early-career CV)."""
 
     SUMMARY = "summary"
     EDUCATION = "education"
@@ -68,8 +68,28 @@ class SectionType(StrEnum):
     CERTIFICATIONS = "certifications"
     ACHIEVEMENTS = "achievements"
     AWARDS = "awards"
+    RESEARCH = "research"
+    VOLUNTEER_EXPERIENCE = "volunteer_experience"
+    LEADERSHIP_ROLES = "leadership_roles"
+    ORGANIZATIONS = "organizations"
+    LANGUAGES = "languages"
+    REFERENCES = "references"
+    HACKATHONS = "hackathons"
+    COMPETITIONS = "competitions"
+    PATENTS = "patents"
 
 
 class GenerationStatus(StrEnum):
     SUCCESS = "success"
+    FAILED = "failed"
+
+
+class ImportSessionStatus(StrEnum):
+    """Lifecycle of a CV-import review session. Nothing reaches the real
+    profile tables until CONFIRMED -- PENDING/FAILED sessions are pure
+    staging, safe to discard."""
+
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    REJECTED = "rejected"
     FAILED = "failed"

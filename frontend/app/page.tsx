@@ -1,21 +1,27 @@
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { PublicNavbar } from "@/components/navbar/PublicNavbar";
+import { Hero } from "@/components/marketing/Hero";
+import { ValueSection } from "@/components/marketing/ValueSection";
+import { TemplatesPreview } from "@/components/marketing/TemplatesPreview";
+import { HowItWorks } from "@/components/marketing/HowItWorks";
+import { FeaturesSection } from "@/components/marketing/FeaturesSection";
+import { AboutSection } from "@/components/marketing/AboutSection";
+import { FinalCta } from "@/components/marketing/FinalCta";
+import { Footer } from "@/components/marketing/Footer";
 
 export default function Home() {
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-      <h1 className="text-3xl font-semibold tracking-tight">AI Career Operating System</h1>
-      <p className="max-w-md text-muted-foreground">
-        One profile. Infinite documents. Build in progress.
-      </p>
-      <div className="flex gap-3">
-        <Button asChild>
-          <Link href="/register">Get started</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/login">Log in</Link>
-        </Button>
-      </div>
-    </main>
+    <div className="flex flex-1 flex-col">
+      <PublicNavbar />
+      <main className="flex flex-1 flex-col">
+        <Hero />
+        <ValueSection />
+        <TemplatesPreview />
+        <HowItWorks />
+        <FeaturesSection />
+        <AboutSection />
+        <FinalCta />
+      </main>
+      <Footer />
+    </div>
   );
 }

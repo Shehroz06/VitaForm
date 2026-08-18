@@ -6,7 +6,16 @@ export type SectionType =
   | "skills"
   | "certifications"
   | "achievements"
-  | "awards";
+  | "awards"
+  | "research"
+  | "volunteer_experience"
+  | "leadership_roles"
+  | "organizations"
+  | "languages"
+  | "references"
+  | "hackathons"
+  | "competitions"
+  | "patents";
 
 export interface ContactVisibility {
   phone: boolean;
@@ -24,10 +33,34 @@ export interface ResumeSection {
   item_ids: string[];
 }
 
+/**
+ * The four font choices map to real installed font stacks server-side (see
+ * backend's renderer.py FONT_STACKS) -- arial/times are always available
+ * (fonts-liberation), calibri/georgia need fonts-crosextra-carlito/caladea.
+ */
+export type FontFamily = "arial" | "calibri" | "times" | "georgia";
+export type Spacing = "compact" | "cozy" | "relaxed";
+
+/**
+ * Visual knobs the exported PDF actually renders with -- part of the real,
+ * persisted resume content (not a client-only preview toggle), so what the
+ * user picks in the builder is what shows up in the downloaded file.
+ */
+export interface ResumeStyle {
+  accent_color: string;
+  font_family: FontFamily;
+  spacing: Spacing;
+  // Computed-only (0.8-1.0): set exclusively by the AI-generation one-page
+  // trim loop when spacing presets alone don't make content fit -- never a
+  // manual choice in the customizer.
+  content_density: number;
+}
+
 export interface ResumeContent {
   summary: string | null;
   contact_visibility: ContactVisibility;
   sections: ResumeSection[];
+  style: ResumeStyle;
 }
 
 export interface ResumeTemplate {
@@ -85,8 +118,15 @@ export interface ExportedResumeFile {
 
 export interface ResumeGeneratePayload {
   title?: string | null;
-  template_id: string;
+  // Optional, same as title -- omitted means "use the default template."
+  template_id?: string | null;
+  accent_color?: string | null;
   job_description: string;
   target_role?: string | null;
   target_company?: string | null;
+}
+
+export interface GenerateResumeResponse {
+  resume_id: string;
+  file: ExportedResumeFile;
 }

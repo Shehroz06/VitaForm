@@ -56,6 +56,25 @@ class ResetPasswordRequest(BaseModel):
         return _validate_password_strength(value)
 
 
+class AdminResetPasswordRequest(BaseModel):
+    """Lets an admin set a new password for any user directly -- bypasses
+    the email-token flow entirely, for when email delivery isn't configured
+    or a user is otherwise locked out. Gated by require_role("admin")."""
+
+    email: EmailStr
+    new_password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, value: str) -> str:
+        return _validate_password_strength(value)
+
+
+class UpdateMeRequest(BaseModel):
+    first_name: str | None = Field(default=None, max_length=100)
+    last_name: str | None = Field(default=None, max_length=100)
+
+
 class UserResponse(BaseModel):
     id: uuid.UUID
     email: EmailStr

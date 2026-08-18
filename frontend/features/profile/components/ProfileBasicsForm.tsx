@@ -7,15 +7,17 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { AvatarUpload } from "@/features/profile/components/AvatarUpload";
 import { useUpdateProfile } from "@/features/profile/hooks/use-profile";
 import { type ProfileBasicsFormValues, profileBasicsSchema } from "@/features/profile/schemas";
 import type { Profile } from "@/features/profile/types";
+import { useUpdateMe } from "@/features/auth/hooks/use-auth";
+import type { User } from "@/features/auth/types";
 import { ApiError } from "@/services/api-client";
 
-export function ProfileBasicsForm({ profile }: { profile: Profile }) {
+export function ProfileBasicsForm({ profile, user }: { profile: Profile; user: User }) {
   const updateProfile = useUpdateProfile();
+  const updateMe = useUpdateMe();
   const {
     register,
     handleSubmit,
@@ -23,50 +25,58 @@ export function ProfileBasicsForm({ profile }: { profile: Profile }) {
     formState: { errors, isDirty },
   } = useForm<ProfileBasicsFormValues>({
     resolver: zodResolver(profileBasicsSchema),
-    defaultValues: toFormValues(profile),
+    defaultValues: toFormValues(profile, user),
   });
 
   useEffect(() => {
-    reset(toFormValues(profile));
-  }, [profile, reset]);
+    reset(toFormValues(profile, user));
+  }, [profile, user, reset]);
 
   const onSubmit = (values: ProfileBasicsFormValues) => {
-    const payload = Object.fromEntries(
-      Object.entries(values).map(([key, value]) => [key, value === "" ? null : value]),
+    const { first_name, last_name, ...profileValues } = values;
+    const profilePayload = Object.fromEntries(
+      Object.entries(profileValues).map(([key, value]) => [key, value === "" ? null : value]),
     );
-    updateProfile.mutate(payload, {
-      onSuccess: () => toast.success("Profile updated."),
-      onError: (error) => {
+
+    Promise.all([
+      updateMe.mutateAsync({
+        first_name: first_name || null,
+        last_name: last_name || null,
+      }),
+      updateProfile.mutateAsync(profilePayload),
+    ])
+      .then(() => toast.success("Profile updated."))
+      .catch((error: unknown) => {
         toast.error(error instanceof ApiError ? error.message : "Failed to update profile.");
-      },
-    });
+      });
   };
+
+  const isPending = updateProfile.isPending || updateMe.isPending;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
       <AvatarUpload profile={profile} />
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="headline">Headline</Label>
-          <Input id="headline" placeholder="Software Engineer" {...register("headline")} />
-          {errors.headline && (
-            <p className="text-sm text-destructive">{errors.headline.message}</p>
-          )}
+          <Label htmlFor="first_name">First name</Label>
+          <Input id="first_name" {...register("first_name")} />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="last_name">Last name</Label>
+          <Input id="last_name" {...register("last_name")} />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" value={user.email} disabled readOnly />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="phone">Phone</Label>
+          <Input id="phone" {...register("phone")} />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="location">Location</Label>
           <Input id="location" placeholder="Remote" {...register("location")} />
-        </div>
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="bio">Bio</Label>
-        <Textarea id="bio" rows={3} {...register("bio")} />
-        {errors.bio && <p className="text-sm text-destructive">{errors.bio.message}</p>}
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="phone">Phone</Label>
-          <Input id="phone" {...register("phone")} />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="website_url">Website</Label>
@@ -94,17 +104,18 @@ export function ProfileBasicsForm({ profile }: { profile: Profile }) {
           )}
         </div>
       </div>
-      <Button type="submit" disabled={!isDirty || updateProfile.isPending} className="self-start">
-        {updateProfile.isPending ? "Saving..." : "Save changes"}
+
+      <Button type="submit" disabled={!isDirty || isPending} className="self-start">
+        {isPending ? "Saving..." : "Save changes"}
       </Button>
     </form>
   );
 }
 
-function toFormValues(profile: Profile): ProfileBasicsFormValues {
+function toFormValues(profile: Profile, user: User): ProfileBasicsFormValues {
   return {
-    headline: profile.headline ?? "",
-    bio: profile.bio ?? "",
+    first_name: user.first_name ?? "",
+    last_name: user.last_name ?? "",
     phone: profile.phone ?? "",
     location: profile.location ?? "",
     website_url: profile.website_url ?? "",

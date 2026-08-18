@@ -22,6 +22,27 @@ _jinja_env = Environment(
     autoescape=select_autoescape(["html.jinja2"]),
 )
 
+# Single source of truth for style.font_family -> real installed font stack,
+# so every Jinja2 template consumes the same resolved CSS value instead of
+# each re-implementing this lookup. arial/times are Liberation fonts, already
+# installed via the `fonts-liberation` apt package; calibri/georgia are
+# metric-compatible open-license substitutes installed via
+# `fonts-crosextra-carlito`/`fonts-crosextra-caladea` (see backend.Dockerfile).
+FONT_STACKS: dict[str, str] = {
+    "arial": '"Liberation Sans", Arial, Helvetica, sans-serif',
+    "calibri": '"Carlito", Calibri, sans-serif',
+    "times": '"Liberation Serif", "Times New Roman", Times, serif',
+    "georgia": '"Caladea", Georgia, "Cambria", serif',
+}
+
+# Same idea for style.spacing -- one resolved set of CSS values per density
+# level, shared by every template rather than re-derived per file.
+SPACING_METRICS: dict[str, dict[str, str]] = {
+    "compact": {"line_height": "1.3", "section_gap": "8pt", "entry_gap": "5pt"},
+    "cozy": {"line_height": "1.45", "section_gap": "12pt", "entry_gap": "8pt"},
+    "relaxed": {"line_height": "1.6", "section_gap": "16pt", "entry_gap": "11pt"},
+}
+
 
 async def _fetch_section_items(
     db: AsyncSession, model: type[Any], item_ids: list[uuid.UUID], profile_id: uuid.UUID
@@ -54,6 +75,7 @@ class ResumeRenderer:
         template: ResumeTemplate,
         profile: Profile,
         email: str,
+        full_name: str,
     ) -> bytes:
         content = ResumeContent.model_validate(version.content)
 
@@ -81,10 +103,14 @@ class ResumeRenderer:
 
         html = _jinja_env.get_template(f"{template.slug}/resume.html.jinja2").render(
             resume_title=resume.title,
+            full_name=full_name or resume.title,
             profile=profile,
             email=email,
             contact_visibility=content.contact_visibility,
             sections=resolved_sections,
+            style=content.style,
+            font_stack=FONT_STACKS[content.style.font_family],
+            spacing=SPACING_METRICS[content.style.spacing],
         )
         pdf_bytes: bytes = HTML(string=html, base_url=str(_TEMPLATES_DIR)).write_pdf()
         return pdf_bytes

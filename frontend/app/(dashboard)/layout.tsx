@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { DashboardNavbar } from "@/components/navbar/DashboardNavbar";
 import { useAuthStore } from "@/store/auth-store";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -22,5 +23,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
-  return <>{children}</>;
+  return (
+    <div className="flex min-h-full flex-1 flex-col">
+      <DashboardNavbar />
+      <div className="flex flex-1 flex-col">{children}</div>
+    </div>
+  );
 }

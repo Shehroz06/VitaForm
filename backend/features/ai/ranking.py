@@ -68,12 +68,18 @@ def _score_experience(item: Any, keywords: set[str]) -> float:
     )
 
 
+def _text_for_project(item: Any) -> str:
+    return " ".join(filter(None, [item.title, item.role, item.description]))
+
+
+def _skill_text_for_project(item: Any) -> str:
+    return " ".join(skill.name for skill in item.skills)
+
+
 def _score_project(item: Any, keywords: set[str]) -> float:
-    text = " ".join(filter(None, [item.title, item.role, item.description]))
-    skill_text = " ".join(skill.name for skill in item.skills)
     return (
-        _text_overlap_score(text, keywords) * 2
-        + _text_overlap_score(skill_text, keywords) * 1.5
+        _text_overlap_score(_text_for_project(item), keywords) * 2
+        + _text_overlap_score(_skill_text_for_project(item), keywords) * 1.5
         + (2.0 if item.is_pinned else 0.0)
         + _recency_bonus(item.end_date)
     )
@@ -89,19 +95,125 @@ def _score_skill(item: Any, keywords: set[str]) -> float:
     return match_bonus + level_bonus
 
 
+def _text_for_certification(item: Any) -> str:
+    return " ".join(filter(None, [item.name, item.issuing_organization]))
+
+
 def _score_certification(item: Any, keywords: set[str]) -> float:
-    text = " ".join(filter(None, [item.name, item.issuing_organization]))
-    return _text_overlap_score(text, keywords) * 2 + _recency_bonus(item.issue_date)
+    return _text_overlap_score(_text_for_certification(item), keywords) * 2 + _recency_bonus(
+        item.issue_date
+    )
+
+
+def _text_for_achievement(item: Any) -> str:
+    return " ".join(filter(None, [item.title, item.issuer, item.description]))
 
 
 def _score_achievement(item: Any, keywords: set[str]) -> float:
-    text = " ".join(filter(None, [item.title, item.issuer, item.description]))
-    return _text_overlap_score(text, keywords) + _recency_bonus(item.date_achieved)
+    return _text_overlap_score(_text_for_achievement(item), keywords) + _recency_bonus(
+        item.date_achieved
+    )
+
+
+def _text_for_award(item: Any) -> str:
+    return " ".join(filter(None, [item.title, item.issuer, item.description]))
 
 
 def _score_award(item: Any, keywords: set[str]) -> float:
-    text = " ".join(filter(None, [item.title, item.issuer, item.description]))
-    return _text_overlap_score(text, keywords) + _recency_bonus(item.date_received)
+    return _text_overlap_score(_text_for_award(item), keywords) + _recency_bonus(
+        item.date_received
+    )
+
+
+def _text_for_research(item: Any) -> str:
+    return " ".join(filter(None, [item.title, item.publication_venue, item.description]))
+
+
+def _score_research(item: Any, keywords: set[str]) -> float:
+    return _text_overlap_score(_text_for_research(item), keywords) * 2 + _recency_bonus(
+        item.publication_date
+    )
+
+
+def _text_for_volunteer_experience(item: Any) -> str:
+    return " ".join(filter(None, [item.role, item.organization_name, item.description]))
+
+
+def _score_volunteer_experience(item: Any, keywords: set[str]) -> float:
+    return _text_overlap_score(_text_for_volunteer_experience(item), keywords) + _recency_bonus(
+        item.end_date, is_current=item.is_current
+    )
+
+
+def _text_for_leadership_role(item: Any) -> str:
+    return " ".join(filter(None, [item.title, item.organization_name, item.description]))
+
+
+def _score_leadership_role(item: Any, keywords: set[str]) -> float:
+    return _text_overlap_score(_text_for_leadership_role(item), keywords) + _recency_bonus(
+        item.end_date, is_current=item.is_current
+    )
+
+
+def _text_for_organization(item: Any) -> str:
+    return " ".join(filter(None, [item.organization_name, item.role, item.description]))
+
+
+def _score_organization(item: Any, keywords: set[str]) -> float:
+    return _text_overlap_score(_text_for_organization(item), keywords) + _recency_bonus(
+        item.end_date, is_current=item.is_current
+    )
+
+
+_PROFICIENCY_BONUS = {
+    "native": 2.0,
+    "fluent": 1.5,
+    "professional": 1.0,
+    "conversational": 0.5,
+    "basic": 0.0,
+}
+
+
+def _score_language(item: Any, keywords: set[str]) -> float:
+    name_tokens = extract_keywords(item.name)
+    match_bonus = 3.0 if name_tokens & keywords else 0.0
+    proficiency_bonus = _PROFICIENCY_BONUS.get(item.proficiency.value, 0.0)
+    return match_bonus + proficiency_bonus
+
+
+def _score_reference(item: Any, keywords: set[str]) -> float:
+    text = " ".join(filter(None, [item.name, item.relationship, item.description]))
+    return _text_overlap_score(text, keywords) + 1.0
+
+
+def _text_for_hackathon(item: Any) -> str:
+    return " ".join(filter(None, [item.name, item.project_name, item.description]))
+
+
+def _score_hackathon(item: Any, keywords: set[str]) -> float:
+    return _text_overlap_score(_text_for_hackathon(item), keywords) + _recency_bonus(
+        item.event_date
+    )
+
+
+def _text_for_competition(item: Any) -> str:
+    return " ".join(filter(None, [item.name, item.result, item.description]))
+
+
+def _score_competition(item: Any, keywords: set[str]) -> float:
+    return _text_overlap_score(_text_for_competition(item), keywords) + _recency_bonus(
+        item.event_date
+    )
+
+
+def _text_for_patent(item: Any) -> str:
+    return " ".join(filter(None, [item.title, item.description]))
+
+
+def _score_patent(item: Any, keywords: set[str]) -> float:
+    return _text_overlap_score(_text_for_patent(item), keywords) * 2 + _recency_bonus(
+        item.filing_date
+    )
 
 
 _SCORERS: dict[SectionType, Callable[[Any, set[str]], float]] = {
@@ -112,7 +224,35 @@ _SCORERS: dict[SectionType, Callable[[Any, set[str]], float]] = {
     SectionType.CERTIFICATIONS: _score_certification,
     SectionType.ACHIEVEMENTS: _score_achievement,
     SectionType.AWARDS: _score_award,
+    SectionType.RESEARCH: _score_research,
+    SectionType.VOLUNTEER_EXPERIENCE: _score_volunteer_experience,
+    SectionType.LEADERSHIP_ROLES: _score_leadership_role,
+    SectionType.ORGANIZATIONS: _score_organization,
+    SectionType.LANGUAGES: _score_language,
+    SectionType.REFERENCES: _score_reference,
+    SectionType.HACKATHONS: _score_hackathon,
+    SectionType.COMPETITIONS: _score_competition,
+    SectionType.PATENTS: _score_patent,
 }
+
+_GATE_TEXT_BUILDERS: dict[SectionType, Callable[[Any], str]] = {
+    SectionType.PROJECTS: lambda item: f"{_text_for_project(item)} {_skill_text_for_project(item)}",
+    SectionType.CERTIFICATIONS: _text_for_certification,
+    SectionType.ACHIEVEMENTS: _text_for_achievement,
+    SectionType.AWARDS: _text_for_award,
+    SectionType.RESEARCH: _text_for_research,
+    SectionType.VOLUNTEER_EXPERIENCE: _text_for_volunteer_experience,
+    SectionType.LEADERSHIP_ROLES: _text_for_leadership_role,
+    SectionType.ORGANIZATIONS: _text_for_organization,
+    SectionType.HACKATHONS: _text_for_hackathon,
+    SectionType.COMPETITIONS: _text_for_competition,
+    SectionType.PATENTS: _text_for_patent,
+}
+"""Section types where an item with zero job-description keyword overlap is
+never offered to the AI as a candidate at all -- a deterministic rules gate
+rather than trusting the AI to omit irrelevant accomplishments on its own.
+Education/experience/skills/languages/references are deliberately excluded:
+career history integrity matters more there than an exact keyword match."""
 
 _CANDIDATE_CAPS: dict[SectionType, int] = {
     SectionType.EDUCATION: 4,
@@ -122,6 +262,15 @@ _CANDIDATE_CAPS: dict[SectionType, int] = {
     SectionType.CERTIFICATIONS: 6,
     SectionType.ACHIEVEMENTS: 6,
     SectionType.AWARDS: 6,
+    SectionType.RESEARCH: 6,
+    SectionType.VOLUNTEER_EXPERIENCE: 4,
+    SectionType.LEADERSHIP_ROLES: 4,
+    SectionType.ORGANIZATIONS: 4,
+    SectionType.LANGUAGES: 10,
+    SectionType.REFERENCES: 4,
+    SectionType.HACKATHONS: 6,
+    SectionType.COMPETITIONS: 6,
+    SectionType.PATENTS: 6,
 }
 
 
@@ -141,6 +290,9 @@ def rank_and_select(
         scorer = _SCORERS.get(section_type)
         if scorer is None:
             continue
+        gate_text = _GATE_TEXT_BUILDERS.get(section_type)
+        if gate_text is not None and keywords:
+            items = [item for item in items if extract_keywords(gate_text(item)) & keywords]
         ranked = sorted(
             (RankedItem(item, scorer(item, keywords)) for item in items),
             key=lambda ranked_item: ranked_item.score,

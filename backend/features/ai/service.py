@@ -4,9 +4,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.settings import Settings
 from app.core.enums import GenerationStatus, SectionType
-from app.exceptions.base import BusinessRuleException
+from app.exceptions.base import BusinessRuleException, ValidationException
 from features.ai.candidates import load_candidate_items
 from features.ai.context_builder import build_candidates
+from features.ai.keyword_synonyms import expand_keywords
+from features.ai.page_fit import fit_resume_to_one_page, flatten_scores
 from features.ai.prompts import (
     RESUME_GENERATION_PURPOSE,
     RESUME_GENERATION_SYSTEM_PROMPT,
@@ -25,11 +27,14 @@ from features.ai.validator import validate_ai_response
 from features.profiles.models import Profile
 from features.resumes.export_service import ResumeExportService
 from features.resumes.models import Resume, ResumeVersion
+from features.resumes.renderer import ResumeRenderer
+from features.resumes.repository import ResumeTemplateRepository
 from features.resumes.schemas import ContactVisibility, ResumeContent, ResumeSection
 from features.resumes.service import ResumeService
 
 _RESUME_TEMPERATURE = 0.2
 _MAX_OUTPUT_TOKENS = 2000
+_DEFAULT_TEMPLATE_SLUG = "classic"
 _RESUME_SECTION_ORDER = [
     SectionType.SUMMARY,
     SectionType.EDUCATION,
@@ -61,6 +66,8 @@ class GenerationService:
         prompt_history_repository: PromptHistoryRepository,
         generation_history_repository: GenerationHistoryRepository,
         provider_log_repository: AIProviderLogRepository,
+        renderer: ResumeRenderer,
+        template_repository: ResumeTemplateRepository,
     ) -> None:
         self._db = db
         self._settings = settings
@@ -69,12 +76,18 @@ class GenerationService:
         self._prompt_history = prompt_history_repository
         self._generation_history = generation_history_repository
         self._provider_logs = provider_log_repository
+        self._renderer = renderer
+        self._templates = template_repository
 
     async def generate_resume(
-        self, profile: Profile, user_email: str, request: ResumeGenerateRequest
+        self,
+        profile: Profile,
+        user_email: str,
+        user_full_name: str,
+        request: ResumeGenerateRequest,
     ) -> ResumeVersion:
         items_by_type = await load_candidate_items(self._db, profile.id)
-        keywords = extract_keywords(request.job_description)
+        keywords = expand_keywords(extract_keywords(request.job_description))
         ranked = rank_and_select(items_by_type, keywords)
         candidates_by_type = build_candidates(ranked)
         candidate_ids_by_section = {
@@ -115,19 +128,48 @@ class GenerationService:
             )
 
         content = self._to_resume_content(run_result.value)
+        if request.accent_color:
+            style = content.style.model_copy(update={"accent_color": request.accent_color})
+            content = content.model_copy(update={"style": style})
         title = request.title or (
             f"AI Resume — {request.target_role or request.target_company or 'Untitled'}"
         )
-        resume = await self._resume_service.create_resume(
-            profile.id, title, request.template_id, content
+
+        template = (
+            await self._templates.get_by_id(request.template_id)
+            if request.template_id is not None
+            else await self._templates.get_by_slug(_DEFAULT_TEMPLATE_SLUG)
         )
+        if template is None or not template.is_active:
+            await self._record_generation(
+                None, profile, prompt_history, GenerationStatus.FAILED, None,
+                run_result.provider, "Selected template is not available.", run_result.attempt_logs,
+            )
+            await self._db.commit()
+            raise ValidationException("Selected template is not available.")
+
+        # Ranking already scored every candidate; reuse those scores to trim
+        # the AI's selection down to what actually fits one page, lowest-
+        # relevance items first, rather than shrinking text to force a fit.
+        content = await fit_resume_to_one_page(
+            renderer=self._renderer,
+            template=template,
+            profile=profile,
+            email=user_email,
+            full_name=user_full_name,
+            title=title,
+            content=content,
+            scores_by_item_id=flatten_scores(ranked),
+        )
+
+        resume = await self._resume_service.create_resume(profile.id, title, template.id, content)
         version = await self._resume_service.get_latest_version(resume)
 
         await self._record_generation(
             resume, profile, prompt_history, GenerationStatus.SUCCESS, version,
             run_result.provider, None, run_result.attempt_logs,
         )
-        await self._export_service.export(resume, version, profile, user_email)
+        await self._export_service.export(resume, version, profile, user_email, user_full_name)
         return version
 
     async def _record_generation(

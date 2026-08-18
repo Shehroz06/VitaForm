@@ -1,10 +1,13 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database.session import get_db
 from app.dependencies.auth import CurrentUser, require_role
 from app.schemas.response import MessageResponse, SuccessResponse
 from features.auth.dependencies import (
+    get_admin_reset_password_use_case,
     get_login_use_case,
     get_logout_use_case,
     get_refresh_use_case,
@@ -14,7 +17,9 @@ from features.auth.dependencies import (
     get_verify_email_use_case,
 )
 from features.auth.models import User
+from features.auth.repository import AuthRepository
 from features.auth.schemas import (
+    AdminResetPasswordRequest,
     ForgotPasswordRequest,
     LoginRequest,
     LogoutRequest,
@@ -22,10 +27,12 @@ from features.auth.schemas import (
     RegisterRequest,
     ResetPasswordRequest,
     TokenResponse,
+    UpdateMeRequest,
     UserResponse,
     VerifyEmailRequest,
 )
 from features.auth.use_cases import (
+    AdminResetPassword,
     LoginUser,
     LogoutUser,
     RefreshAccessToken,
@@ -142,10 +149,34 @@ async def get_me(user: CurrentUser) -> SuccessResponse[UserResponse]:
     return SuccessResponse(message="Current user retrieved.", data=_to_user_response(user))
 
 
+@router.patch("/me", response_model=SuccessResponse[UserResponse])
+async def update_me(
+    data: UpdateMeRequest,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> SuccessResponse[UserResponse]:
+    repository = AuthRepository(db)
+    await repository.update_user_name(user, data.first_name, data.last_name)
+    return SuccessResponse(message="Profile updated successfully.", data=_to_user_response(user))
+
+
 @router.get("/admin-check", response_model=SuccessResponse[MessageResponse])
 async def admin_check(
     user: Annotated[User, Depends(require_role("admin"))],
 ) -> SuccessResponse[MessageResponse]:
     return SuccessResponse(
         message="Admin access confirmed.", data=MessageResponse(message="You are an admin.")
+    )
+
+
+@router.post("/admin/reset-password", response_model=SuccessResponse[UserResponse])
+async def admin_reset_password(
+    data: AdminResetPasswordRequest,
+    admin: Annotated[User, Depends(require_role("admin"))],
+    use_case: Annotated[AdminResetPassword, Depends(get_admin_reset_password_use_case)],
+) -> SuccessResponse[UserResponse]:
+    user = await use_case.execute(data)
+    return SuccessResponse(
+        message=f"Password reset for {user.email}. All of their sessions were signed out.",
+        data=_to_user_response(user),
     )

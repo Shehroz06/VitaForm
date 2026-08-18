@@ -3,6 +3,7 @@ import uuid
 from pydantic import BaseModel, Field
 
 from app.core.enums import SectionType
+from features.files.schemas import FileResponse
 
 
 class AIResumeSection(BaseModel):
@@ -23,7 +24,20 @@ class AIResumeResponse(BaseModel):
 
 class ResumeGenerateRequest(BaseModel):
     title: str | None = Field(default=None, max_length=200)
-    template_id: uuid.UUID
+    # Optional, same as title -- template/color are presentation choices,
+    # not part of "describe the role." Omitted means "use the default
+    # template with its own default look."
+    template_id: uuid.UUID | None = Field(default=None)
+    accent_color: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
     job_description: str = Field(min_length=50, max_length=10000)
     target_role: str | None = Field(default=None, max_length=150)
     target_company: str | None = Field(default=None, max_length=150)
+
+
+class GenerateResumeResponse(BaseModel):
+    """Carries the resume id alongside the exported file, so callers can
+    navigate straight to the resume that was just generated instead of only
+    getting a downloadable PDF with no link back to it."""
+
+    resume_id: uuid.UUID
+    file: FileResponse

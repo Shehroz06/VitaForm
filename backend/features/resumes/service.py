@@ -111,6 +111,16 @@ class ResumeService:
             content=content.model_dump(mode="json"),
         )
 
+    async def autosave_content(self, resume: Resume, content: ResumeContent) -> ResumeVersion:
+        """Updates the current (latest) version's content in place -- no new
+        version_number, unlike create_new_version. Keeps the persisted
+        content honest against whatever's on screen between explicit Saves,
+        so Export always renders what the user actually sees rather than a
+        stale, previously-saved snapshot."""
+        await self._validate_item_ownership(resume.profile_id, content)
+        latest = await self.get_latest_version(resume)
+        return await self._versions.update(latest, content=content.model_dump(mode="json"))
+
     async def _validate_item_ownership(
         self, profile_id: uuid.UUID, content: ResumeContent
     ) -> None:

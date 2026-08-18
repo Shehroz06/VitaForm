@@ -7,6 +7,7 @@ from features.awards.router import router as awards_router
 from features.certifications.router import router as certifications_router
 from features.companion.router import router as companion_router
 from features.competitions.router import router as competitions_router
+from features.cv_import.router import router as cv_import_router
 from features.education.router import router as education_router
 from features.experience.router import router as experience_router
 from features.files.router import router as files_router
@@ -48,3 +49,4 @@ api_v1_router.include_router(competitions_router)
 api_v1_router.include_router(patents_router)
 api_v1_router.include_router(jobs_router)
 api_v1_router.include_router(companion_router)
+api_v1_router.include_router(cv_import_router)

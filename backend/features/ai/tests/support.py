@@ -27,7 +27,13 @@ class FakeAIProvider:
         self.call_count = 0
 
     async def generate(
-        self, system_prompt: str, user_prompt: str, *, temperature: float, max_tokens: int
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        *,
+        temperature: float,
+        max_tokens: int,
+        images: list[bytes] | None = None,
     ) -> GenerationResult:
         self.call_count += 1
 

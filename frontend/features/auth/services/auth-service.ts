@@ -5,6 +5,7 @@ import type {
   RegisterPayload,
   ResetPasswordPayload,
   TokenResponse,
+  UpdateMePayload,
   User,
   VerifyEmailPayload,
 } from "@/features/auth/types";
@@ -21,4 +22,5 @@ export const authService = {
   resetPassword: (payload: ResetPasswordPayload) =>
     apiClient.post<{ message: string }>("/auth/reset-password", payload),
   getCurrentUser: () => apiClient.get<User>("/auth/me"),
+  updateMe: (payload: UpdateMePayload) => apiClient.patch<User>("/auth/me", payload),
 };

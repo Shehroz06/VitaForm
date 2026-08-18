@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     jwt_refresh_token_expires_days: int = 30
 
     ai_default_provider: str = "gemini"
-    ai_fallback_providers: list[str] = ["groq", "anthropic", "openrouter"]
+    ai_fallback_providers: list[str] = ["groq", "openrouter"]
     ai_max_retries: int = 2
 
     anthropic_api_key: str | None = None
@@ -40,6 +40,15 @@ class Settings(BaseSettings):
 
     email_verification_token_expires_hours: int = 24
     password_reset_token_expires_hours: int = 1
+
+    email_provider: str = "console"
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_use_tls: bool = True
+    smtp_from_address: str = "no-reply@example.com"
+    smtp_from_name: str = "AI Career Platform"
 
     api_base_url: str = "http://localhost:8000/api/v1"
 

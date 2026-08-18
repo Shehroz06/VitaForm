@@ -1,0 +1,23 @@
+# --- Node / Next.js build artifacts ---
+node_modules/
+.next/
+out/
+.turbo/
+next-env.d.ts
+*.tsbuildinfo
+
+# --- Environment / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- VCS / editor / OS ---
+.git/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+
+# --- Logs ---
+*.log
+npm-debug.log*

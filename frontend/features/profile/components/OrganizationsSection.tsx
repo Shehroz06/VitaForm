@@ -89,7 +89,7 @@ function OrganizationCard({ item, onEdit }: { item: Organization; onEdit: () => 
   };
 
   return (
-    <div className="flex items-start justify-between rounded-lg border p-3">
+    <div className="flex items-start justify-between rounded-xl bg-card p-3.5 ring-1 ring-foreground/10 transition-colors hover:bg-muted/40">
       <div>
         <p className="font-medium">{item.organization_name}</p>
         {item.role && <p className="text-sm text-muted-foreground">{item.role}</p>}

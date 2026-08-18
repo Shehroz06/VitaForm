@@ -1,3 +1,4 @@
+import pymupdf
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -87,12 +88,62 @@ async def test_generate_resume_happy_path(
 
     assert response.status_code == 200
     body = response.json()["data"]
-    assert body["content_type"] == "application/pdf"
-    assert body["size_bytes"] > 0
+    assert body["resume_id"]
+    assert body["file"]["content_type"] == "application/pdf"
+    assert body["file"]["size_bytes"] > 0
 
-    pdf_response = await client.get(body["url"])
+    pdf_response = await client.get(body["file"]["url"])
     assert pdf_response.status_code == 200
     assert pdf_response.content[:4] == b"%PDF"
+
+
+async def test_generate_resume_defaults_to_classic_template_when_omitted(
+    client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch
+) -> None:
+    headers = await _auth(client, captured_emails, "aiGenTemplateDefault@example.com")
+    await _seed_profile_data(client, headers)
+    _patch_providers(monkeypatch, {"gemini": FakeAIProvider("gemini")})
+
+    response = await client.post(
+        "/api/v1/resumes/generate",
+        headers=headers,
+        json={"job_description": _LONG_JOB_DESCRIPTION},
+    )
+
+    assert response.status_code == 200
+    resume_id = response.json()["data"]["resume_id"]
+
+    resume_response = await client.get(f"/api/v1/resumes/{resume_id}", headers=headers)
+    templates_response = await client.get("/api/v1/resume-templates")
+    classic_id = next(
+        t["id"] for t in templates_response.json()["data"] if t["slug"] == "classic"
+    )
+    assert resume_response.json()["data"]["template_id"] == classic_id
+
+
+async def test_generate_resume_applies_requested_accent_color(
+    client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch
+) -> None:
+    headers = await _auth(client, captured_emails, "aiGenAccentColor@example.com")
+    await _seed_profile_data(client, headers)
+    template_id = await _classic_template_id(client)
+    _patch_providers(monkeypatch, {"gemini": FakeAIProvider("gemini")})
+
+    response = await client.post(
+        "/api/v1/resumes/generate",
+        headers=headers,
+        json={
+            "template_id": template_id,
+            "job_description": _LONG_JOB_DESCRIPTION,
+            "accent_color": "#2c4a6e",
+        },
+    )
+
+    assert response.status_code == 200
+    resume_id = response.json()["data"]["resume_id"]
+
+    content_response = await client.get(f"/api/v1/resumes/{resume_id}/content", headers=headers)
+    assert content_response.json()["data"]["content"]["style"]["accent_color"] == "#2c4a6e"
 
 
 async def test_generate_resume_retries_and_succeeds_after_invalid_json(
@@ -127,7 +178,7 @@ async def test_generate_resume_falls_back_to_second_provider(
         monkeypatch,
         {
             "gemini": FakeAIProvider("gemini", fail_times=999),
-            "anthropic": FakeAIProvider("anthropic"),
+            "groq": FakeAIProvider("groq"),
         },
     )
 
@@ -145,7 +196,7 @@ async def test_generate_resume_falls_back_to_second_provider(
         )
     ).scalars().first()
     assert generation is not None
-    assert generation.provider == "anthropic"
+    assert generation.provider == "groq"
     assert generation.status.value == "success"
 
 
@@ -159,7 +210,7 @@ async def test_generate_resume_returns_friendly_error_when_all_providers_fail(
         monkeypatch,
         {
             "gemini": FakeAIProvider("gemini", fail_times=999),
-            "anthropic": FakeAIProvider("anthropic", fail_times=999),
+            "groq": FakeAIProvider("groq", fail_times=999),
         },
     )
 
@@ -186,7 +237,7 @@ async def test_failed_generation_is_logged_without_creating_a_resume(
         monkeypatch,
         {
             "gemini": FakeAIProvider("gemini", fail_times=999),
-            "anthropic": FakeAIProvider("anthropic", fail_times=999),
+            "groq": FakeAIProvider("groq", fail_times=999),
         },
     )
 
@@ -230,3 +281,76 @@ async def test_successful_generation_records_provider_logs(
     assert len(logs) >= 1
     assert logs[-1].success is True
     assert logs[-1].provider == "gemini"
+
+
+_LONG_ROLE_DESCRIPTION = (
+    "Led backend engineering for a high-traffic Python and AWS platform, designing "
+    "scalable REST APIs, distributed queues, and observability tooling used by dozens "
+    "of downstream teams. Owned the service's reliability roadmap end to end, from "
+    "incident response through capacity planning, and mentored a growing group of "
+    "backend engineers on API design, testing, and deployment practices. "
+) * 3
+
+
+async def _seed_page_overflowing_profile(client: AsyncClient, headers: dict[str, str]) -> None:
+    """Six long-description experiences plus a real education entry -- more
+    content than a single A4 page can hold at the classic template's default
+    styling, so the AI-selected content is guaranteed to need trimming."""
+    await client.post(
+        "/api/v1/education",
+        headers=headers,
+        json={
+            "institution_name": "MIT",
+            "degree": "BSc Computer Science",
+            "start_date": "2014-09-01",
+            "end_date": "2018-06-01",
+            "is_current": False,
+        },
+    )
+    for i in range(6):
+        await client.post(
+            "/api/v1/experience",
+            headers=headers,
+            json={
+                "company_name": f"Company {i}",
+                "job_title": "Senior Backend Engineer",
+                "employment_type": "full_time",
+                "start_date": f"{2018 + i}-01-01",
+                "end_date": f"{2018 + i}-12-01",
+                "is_current": False,
+                "description": _LONG_ROLE_DESCRIPTION,
+            },
+        )
+
+
+async def test_generate_resume_trims_content_to_fit_one_page(
+    client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch
+) -> None:
+    headers = await _auth(client, captured_emails, "aiGen7@example.com")
+    await _seed_page_overflowing_profile(client, headers)
+    template_id = await _classic_template_id(client)
+    _patch_providers(monkeypatch, {"gemini": FakeAIProvider("gemini")})
+
+    response = await client.post(
+        "/api/v1/resumes/generate",
+        headers=headers,
+        json={"template_id": template_id, "job_description": _LONG_JOB_DESCRIPTION},
+    )
+
+    assert response.status_code == 200
+    body = response.json()["data"]
+
+    pdf_response = await client.get(body["file"]["url"])
+    with pymupdf.open(stream=pdf_response.content, filetype="pdf") as doc:
+        assert doc.page_count == 1
+
+    resume_id = body["resume_id"]
+    version_response = await client.get(f"/api/v1/resumes/{resume_id}/content", headers=headers)
+    experience_section = next(
+        s
+        for s in version_response.json()["data"]["content"]["sections"]
+        if s["section_type"] == "experience"
+    )
+    # The AI was offered all 6 (the FakeAIProvider selects everything it's
+    # given), but the trim loop must have dropped some to reach one page.
+    assert 0 < len(experience_section["item_ids"]) < 6

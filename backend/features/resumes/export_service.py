@@ -29,13 +29,20 @@ class ResumeExportService:
         self._files = file_service
 
     async def export(
-        self, resume: Resume, version: ResumeVersion, profile: Profile, email: str
+        self,
+        resume: Resume,
+        version: ResumeVersion,
+        profile: Profile,
+        email: str,
+        full_name: str,
     ) -> ResumeVersion:
         template = await self._templates.get_by_id(resume.template_id)
         if template is None:
             raise ResourceNotFoundException("Resume template not found.")
 
-        pdf_bytes = await self._renderer.render_pdf(resume, version, template, profile, email)
+        pdf_bytes = await self._renderer.render_pdf(
+            resume, version, template, profile, email, full_name
+        )
 
         if version.rendered_file_id is not None:
             await self._files.delete(version.rendered_file_id, profile.id)

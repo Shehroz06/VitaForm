@@ -5,6 +5,7 @@ import type {
   LoginPayload,
   RegisterPayload,
   ResetPasswordPayload,
+  UpdateMePayload,
   VerifyEmailPayload,
 } from "@/features/auth/types";
 import { useAuthStore } from "@/store/auth-store";
@@ -64,6 +65,19 @@ export function useForgotPassword() {
 export function useResetPassword() {
   return useMutation({
     mutationFn: (payload: ResetPasswordPayload) => authService.resetPassword(payload),
+  });
+}
+
+export function useUpdateMe() {
+  const setUser = useAuthStore((state) => state.setUser);
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: UpdateMePayload) => authService.updateMe(payload),
+    onSuccess: (user) => {
+      setUser(user);
+      queryClient.setQueryData(["auth", "me"], user);
+    },
   });
 }
 

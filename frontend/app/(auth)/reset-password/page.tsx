@@ -8,8 +8,8 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useResetPassword } from "@/features/auth/hooks/use-auth";
 import { type ResetPasswordFormValues, resetPasswordSchema } from "@/features/auth/schemas";
 import { ApiError } from "@/services/api-client";
@@ -83,9 +83,8 @@ function ResetPasswordForm() {
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="new_password">New password</Label>
-            <Input
+            <PasswordInput
               id="new_password"
-              type="password"
               autoComplete="new-password"
               {...register("new_password")}
             />

@@ -50,6 +50,50 @@ def _describe_award(item: Any) -> str:
     return f"{item.title}{issuer}"
 
 
+def _describe_research(item: Any) -> str:
+    venue = f" -- {item.publication_venue}" if item.publication_venue else ""
+    return f"{item.title}{venue} ({item.publication_date or 'date unknown'})"
+
+
+def _describe_volunteer_experience(item: Any) -> str:
+    span = f"{item.start_date}–{'present' if item.is_current else (item.end_date or 'unknown')}"
+    return f"{item.role} at {item.organization_name} ({span})"
+
+
+def _describe_leadership_role(item: Any) -> str:
+    span = f"{item.start_date}–{'present' if item.is_current else (item.end_date or 'unknown')}"
+    return f"{item.title} at {item.organization_name} ({span})"
+
+
+def _describe_organization(item: Any) -> str:
+    role = f" -- {item.role}" if item.role else ""
+    return f"{item.organization_name}{role}"
+
+
+def _describe_language(item: Any) -> str:
+    return f"{item.name} ({item.proficiency.value})"
+
+
+def _describe_reference(item: Any) -> str:
+    relationship = f" -- {item.relationship}" if item.relationship else ""
+    return f"{item.name}{relationship}"
+
+
+def _describe_hackathon(item: Any) -> str:
+    result = f" -- {item.result}" if item.result else ""
+    return f"{item.name}{result}"
+
+
+def _describe_competition(item: Any) -> str:
+    result = f" -- {item.result}" if item.result else ""
+    return f"{item.name}{result}"
+
+
+def _describe_patent(item: Any) -> str:
+    number = f" ({item.patent_number})" if item.patent_number else ""
+    return f"{item.title}{number} -- {item.status.value}"
+
+
 _DESCRIBERS = {
     SectionType.EDUCATION: _describe_education,
     SectionType.EXPERIENCE: _describe_experience,
@@ -58,6 +102,15 @@ _DESCRIBERS = {
     SectionType.CERTIFICATIONS: _describe_certification,
     SectionType.ACHIEVEMENTS: _describe_achievement,
     SectionType.AWARDS: _describe_award,
+    SectionType.RESEARCH: _describe_research,
+    SectionType.VOLUNTEER_EXPERIENCE: _describe_volunteer_experience,
+    SectionType.LEADERSHIP_ROLES: _describe_leadership_role,
+    SectionType.ORGANIZATIONS: _describe_organization,
+    SectionType.LANGUAGES: _describe_language,
+    SectionType.REFERENCES: _describe_reference,
+    SectionType.HACKATHONS: _describe_hackathon,
+    SectionType.COMPETITIONS: _describe_competition,
+    SectionType.PATENTS: _describe_patent,
 }
 
 

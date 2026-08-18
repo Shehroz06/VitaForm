@@ -1,0 +1,34 @@
+# --- Python virtualenv / package artifacts ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.uv/
+
+# --- Test / lint / type-check caches ---
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# --- Environment / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Local dev storage (uploads) ---
+storage/local/
+
+# --- VCS / editor / OS ---
+.git/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+
+# --- Logs ---
+*.log

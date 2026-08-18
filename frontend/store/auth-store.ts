@@ -9,6 +9,7 @@ interface AuthState {
   status: "idle" | "loading" | "authenticated" | "unauthenticated";
   setSession: (user: User, accessToken: string, refreshToken: string) => void;
   setAccessToken: (accessToken: string, refreshToken: string) => void;
+  setUser: (user: User) => void;
   clearSession: () => void;
   setStatus: (status: AuthState["status"]) => void;
 }
@@ -24,6 +25,7 @@ export const useAuthStore = create<AuthState>()(
         set({ user, accessToken, refreshToken, status: "authenticated" }),
       setAccessToken: (accessToken, refreshToken) =>
         set({ accessToken, refreshToken, status: "authenticated" }),
+      setUser: (user) => set({ user }),
       clearSession: () =>
         set({ user: null, accessToken: null, refreshToken: null, status: "unauthenticated" }),
       setStatus: (status) => set({ status }),

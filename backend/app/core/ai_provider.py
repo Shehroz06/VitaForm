@@ -6,10 +6,11 @@ base_url, api_key, and model differ. Swapping the active provider is a
 config change (AI_DEFAULT_PROVIDER), never a code change.
 """
 
+import base64
 import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import tiktoken
 from anthropic import AsyncAnthropic
@@ -35,7 +36,13 @@ class AIProvider(Protocol):
     name: str
 
     async def generate(
-        self, system_prompt: str, user_prompt: str, *, temperature: float, max_tokens: int
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        *,
+        temperature: float,
+        max_tokens: int,
+        images: list[bytes] | None = None,
     ) -> GenerationResult: ...
 
     def stream(
@@ -56,13 +63,32 @@ class AnthropicProvider:
         self._client = AsyncAnthropic(api_key=api_key)
 
     async def generate(
-        self, system_prompt: str, user_prompt: str, *, temperature: float, max_tokens: int
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        *,
+        temperature: float,
+        max_tokens: int,
+        images: list[bytes] | None = None,
     ) -> GenerationResult:
         started = time.monotonic()
+        content: Any = user_prompt
+        if images:
+            content = [{"type": "text", "text": user_prompt}] + [
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/png",
+                        "data": base64.b64encode(image).decode("ascii"),
+                    },
+                }
+                for image in images
+            ]
         response = await self._client.messages.create(
             model=self.model,
             system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}],
+            messages=[{"role": "user", "content": content}],
             temperature=temperature,
             max_tokens=max_tokens,
         )
@@ -122,15 +148,35 @@ class OpenAICompatibleProvider:
         self._client = AsyncOpenAI(api_key=api_key or "unset", base_url=base_url)
 
     async def generate(
-        self, system_prompt: str, user_prompt: str, *, temperature: float, max_tokens: int
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        *,
+        temperature: float,
+        max_tokens: int,
+        images: list[bytes] | None = None,
     ) -> GenerationResult:
         started = time.monotonic()
+        user_content: Any = user_prompt
+        if images:
+            user_content = [{"type": "text", "text": user_prompt}] + [
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{base64.b64encode(image).decode('ascii')}"
+                    },
+                }
+                for image in images
+            ]
         response = await self._client.chat.completions.create(
             model=self.model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
+            messages=cast(
+                Any,
+                [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_content},
+                ],
+            ),
             temperature=temperature,
             max_tokens=max_tokens,
         )

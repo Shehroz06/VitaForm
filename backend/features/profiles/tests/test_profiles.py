@@ -60,7 +60,7 @@ async def test_completion_percentage_increases_with_each_section(
     headers = auth_headers(token)
 
     await client.patch(
-        "/api/v1/profiles/me", headers=headers, json={"headline": "Engineer", "bio": "Bio."}
+        "/api/v1/auth/me", headers=headers, json={"first_name": "Test", "last_name": "User"}
     )
     first = await client.get("/api/v1/profiles/me", headers=headers)
     assert first.json()["data"]["completion_percentage"] == 20

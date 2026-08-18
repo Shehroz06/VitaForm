@@ -92,7 +92,7 @@ function CertificationCard({ item, onEdit }: { item: Certification; onEdit: () =
   };
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border p-3">
+    <div className="flex flex-col gap-2 rounded-xl bg-card p-3.5 ring-1 ring-foreground/10 transition-colors hover:bg-muted/40">
       <div className="flex items-start justify-between">
         <div>
           <p className="font-medium">{item.name}</p>

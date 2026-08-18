@@ -8,6 +8,7 @@ from app.database.session import get_db
 from features.auth.repository import AuthRepository
 from features.auth.service import AuthService
 from features.auth.use_cases import (
+    AdminResetPassword,
     LoginUser,
     LogoutUser,
     RefreshAccessToken,
@@ -71,3 +72,9 @@ def get_reset_password_use_case(
     repository: Annotated[AuthRepository, Depends(get_auth_repository)],
 ) -> ResetPassword:
     return ResetPassword(repository)
+
+
+def get_admin_reset_password_use_case(
+    repository: Annotated[AuthRepository, Depends(get_auth_repository)],
+) -> AdminResetPassword:
+    return AdminResetPassword(repository)

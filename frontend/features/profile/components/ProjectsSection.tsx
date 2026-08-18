@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import {
   useCreateProject,
   useDeleteProject,
@@ -109,11 +110,21 @@ function ProjectCard({ item, onEdit }: { item: Project; onEdit: () => void }) {
   };
 
   return (
-    <div className="flex items-start justify-between rounded-lg border p-3">
+    <div className="flex items-start justify-between rounded-xl bg-card p-3.5 ring-1 ring-foreground/10 transition-colors hover:bg-muted/40">
       <div className="flex flex-col gap-1">
         <p className="font-medium">{item.title}</p>
-        <p className="text-sm text-muted-foreground">{STATUS_LABELS[item.status]}</p>
         {item.description && <p className="text-sm text-muted-foreground">{item.description}</p>}
+        {item.demo_url && (
+          <a
+            href={item.demo_url}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="w-fit text-sm text-primary hover:underline"
+          >
+            {item.demo_url}
+          </a>
+        )}
         {item.skills.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {item.skills.map((skill) => (
@@ -160,6 +171,9 @@ function ProjectDialogContent({
   const isPinned = watch("is_pinned");
   const skillIds = watch("skill_ids");
   const isPending = createProject.isPending || updateProject.isPending;
+  const [showMore, setShowMore] = useState(
+    () => !!(editing && (editing.role || editing.status !== "in_progress" || editing.start_date || editing.repository_url || editing.is_pinned)),
+  );
 
   const toggleSkill = (skillId: string, checked: boolean) => {
     setValue("skill_ids", checked ? [...skillIds, skillId] : skillIds.filter((id) => id !== skillId));
@@ -205,63 +219,16 @@ function ProjectDialogContent({
           <Label htmlFor="description">Description</Label>
           <Textarea id="description" rows={3} {...register("description")} />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="role">Your role</Label>
-            <Input id="role" {...register("role")} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Status</Label>
-            <Select
-              value={status}
-              onValueChange={(value) => setValue("status", value as ProjectStatus)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="demo_url">URL</Label>
+          <Input id="demo_url" placeholder="https://" {...register("demo_url")} />
+          {errors.demo_url && <p className="text-sm text-destructive">{errors.demo_url.message}</p>}
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="start_date">Start date</Label>
-            <Input id="start_date" type="date" {...register("start_date")} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="end_date">End date</Label>
-            <Input id="end_date" type="date" {...register("end_date")} />
-            {errors.end_date && (
-              <p className="text-sm text-destructive">{errors.end_date.message}</p>
-            )}
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="repository_url">Repository URL</Label>
-            <Input id="repository_url" placeholder="https://" {...register("repository_url")} />
-            {errors.repository_url && (
-              <p className="text-sm text-destructive">{errors.repository_url.message}</p>
-            )}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="demo_url">Demo URL</Label>
-            <Input id="demo_url" placeholder="https://" {...register("demo_url")} />
-            {errors.demo_url && (
-              <p className="text-sm text-destructive">{errors.demo_url.message}</p>
-            )}
-          </div>
-        </div>
+
         {availableSkills && availableSkills.length > 0 && (
           <div className="flex flex-col gap-1.5">
-            <Label>Skills used</Label>
-            <div className="flex flex-wrap gap-3 rounded-lg border p-3">
+            <Label>Skills used (optional)</Label>
+            <div className="flex flex-wrap gap-3 rounded-xl bg-card p-3.5 ring-1 ring-foreground/10">
               {availableSkills.map((skill) => (
                 <label key={skill.id} className="flex items-center gap-1.5 text-sm">
                   <Checkbox
@@ -274,13 +241,71 @@ function ProjectDialogContent({
             </div>
           </div>
         )}
-        <label className="flex items-center gap-2 text-sm">
-          <Checkbox
-            checked={isPinned}
-            onCheckedChange={(checked) => setValue("is_pinned", checked === true)}
-          />
-          Pin this project
-        </label>
+
+        <button
+          type="button"
+          onClick={() => setShowMore((v) => !v)}
+          className="flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ChevronDown className={cn("size-4 transition-transform", showMore && "rotate-180")} />
+          More details
+        </button>
+
+        {showMore && (
+          <div className="flex flex-col gap-4 border-t border-border pt-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="role">Your role</Label>
+                <Input id="role" {...register("role")} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>Status</Label>
+                <Select
+                  value={status}
+                  onValueChange={(value) => setValue("status", value as ProjectStatus)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="start_date">Start date</Label>
+                <Input id="start_date" type="date" {...register("start_date")} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="end_date">End date</Label>
+                <Input id="end_date" type="date" {...register("end_date")} />
+                {errors.end_date && (
+                  <p className="text-sm text-destructive">{errors.end_date.message}</p>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="repository_url">Repository URL</Label>
+              <Input id="repository_url" placeholder="https://" {...register("repository_url")} />
+              {errors.repository_url && (
+                <p className="text-sm text-destructive">{errors.repository_url.message}</p>
+              )}
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={isPinned}
+                onCheckedChange={(checked) => setValue("is_pinned", checked === true)}
+              />
+              Pin this project
+            </label>
+          </div>
+        )}
         <DialogFooter>
           <Button type="submit" disabled={isPending}>
             {isPending ? "Saving..." : "Save"}

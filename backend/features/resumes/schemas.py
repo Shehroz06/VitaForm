@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -31,10 +32,28 @@ class ResumeSection(BaseModel):
     item_ids: list[uuid.UUID] = Field(default_factory=list)
 
 
+class ResumeStyle(BaseModel):
+    """Visual knobs every Jinja2 template must render from instead of
+    hardcoding -- so a resume's PDF always reflects what the user actually
+    picked in the builder. font_family names map to real, installed font
+    stacks in the renderer (see renderer.py's FONT_STACKS)."""
+
+    accent_color: str = Field(default="#1a1a1a", pattern=r"^#[0-9a-fA-F]{6}$")
+    font_family: Literal["arial", "calibri", "times", "georgia"] = "arial"
+    spacing: Literal["compact", "cozy", "relaxed"] = "cozy"
+    # Computed-only: set exclusively by the AI-generation one-page trim loop
+    # (features/ai/page_fit.py) when spacing presets alone aren't enough to
+    # fit a page -- never exposed as a manual choice in TemplateCustomizer.
+    # Multiplies font-size and numeric spacing/margins continuously, the
+    # LaTeX-style lever between "spacing preset" and "delete content."
+    content_density: float = Field(default=1.0, ge=0.8, le=1.0)
+
+
 class ResumeContent(BaseModel):
     summary: str | None = Field(default=None, max_length=2000)
     contact_visibility: ContactVisibility = Field(default_factory=ContactVisibility)
     sections: list[ResumeSection] = Field(default_factory=list)
+    style: ResumeStyle = Field(default_factory=ResumeStyle)
 
 
 class ResumeCreateRequest(BaseModel):

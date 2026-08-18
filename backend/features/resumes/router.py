@@ -8,7 +8,7 @@ from app.exceptions.base import ResourceNotFoundException
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
 from app.schemas.response import MessageResponse, SuccessResponse
 from features.ai.dependencies import get_generation_service
-from features.ai.schemas import ResumeGenerateRequest
+from features.ai.schemas import GenerateResumeResponse, ResumeGenerateRequest
 from features.ai.service import GenerationService
 from features.files.dependencies import get_file_repository
 from features.files.repository import FileRepository
@@ -41,6 +41,10 @@ ResumeTemplateRepositoryDep = Annotated[
     ResumeTemplateRepository, Depends(get_resume_template_repository)
 ]
 GenerationServiceDep = Annotated[GenerationService, Depends(get_generation_service)]
+
+
+def _full_name(first_name: str | None, last_name: str | None) -> str:
+    return " ".join(part for part in (first_name, last_name) if part).strip()
 
 
 async def _to_resume_response(resume: Resume, service: ResumeService) -> ResumeResponse:
@@ -96,15 +100,17 @@ async def create_resume(
     )
 
 
-@router.post("/resumes/generate", response_model=SuccessResponse[FileAttachmentResponse])
+@router.post("/resumes/generate", response_model=SuccessResponse[GenerateResumeResponse])
 async def generate_resume(
     data: ResumeGenerateRequest,
     profile: CurrentProfile,
     user: CurrentUser,
     generation_service: GenerationServiceDep,
     file_repository: Annotated[FileRepository, Depends(get_file_repository)],
-) -> SuccessResponse[FileAttachmentResponse]:
-    version = await generation_service.generate_resume(profile, user.email, data)
+) -> SuccessResponse[GenerateResumeResponse]:
+    version = await generation_service.generate_resume(
+        profile, user.email, _full_name(user.first_name, user.last_name), data
+    )
 
     assert version.rendered_file_id is not None
     rendered_file = await file_repository.get_by_id(version.rendered_file_id)
@@ -113,7 +119,10 @@ async def generate_resume(
 
     return SuccessResponse(
         message="Resume generated successfully.",
-        data=FileAttachmentResponse.model_validate(rendered_file),
+        data=GenerateResumeResponse(
+            resume_id=version.resume_id,
+            file=FileAttachmentResponse.model_validate(rendered_file),
+        ),
     )
 
 
@@ -185,6 +194,25 @@ async def update_resume_content(
     )
 
 
+@router.patch("/resumes/{resume_id}/content", response_model=SuccessResponse[ResumeVersionResponse])
+async def autosave_resume_content(
+    resume_id: uuid.UUID,
+    data: ResumeContent,
+    profile: CurrentProfile,
+    service: ResumeServiceDep,
+) -> SuccessResponse[ResumeVersionResponse]:
+    """Updates the current version's content in place -- unlike PUT, this
+    never creates a new version. Used for autosave, so the working draft
+    stays persisted (and therefore exportable) without generating a new
+    history entry on every edit."""
+    resume = await service.get_owned_resume(resume_id, profile.id)
+    version = await service.autosave_content(resume, data)
+    return SuccessResponse(
+        message="Resume content autosaved successfully.",
+        data=ResumeVersionResponse.model_validate(version),
+    )
+
+
 @router.get(
     "/resumes/{resume_id}/versions",
     response_model=SuccessResponse[list[ResumeVersionSummaryResponse]],
@@ -235,7 +263,9 @@ async def export_resume(
 ) -> SuccessResponse[FileAttachmentResponse]:
     resume = await service.get_owned_resume(resume_id, profile.id)
     version = await service.get_latest_version(resume)
-    updated_version = await export_service.export(resume, version, profile, user.email)
+    updated_version = await export_service.export(
+        resume, version, profile, user.email, _full_name(user.first_name, user.last_name)
+    )
 
     assert updated_version.rendered_file_id is not None
     rendered_file = await file_repository.get_by_id(updated_version.rendered_file_id)

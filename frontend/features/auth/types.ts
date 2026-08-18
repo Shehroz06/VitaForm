@@ -39,3 +39,8 @@ export interface ResetPasswordPayload {
 export interface VerifyEmailPayload {
   token: string;
 }
+
+export interface UpdateMePayload {
+  first_name?: string | null;
+  last_name?: string | null;
+}
