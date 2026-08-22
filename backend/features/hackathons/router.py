@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.base_crud import BaseOwnedCrudService
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
-from app.schemas.response import MessageResponse, SuccessResponse
+from app.schemas.response import SuccessResponse
 from features.hackathons.dependencies import get_hackathon_service
 from features.hackathons.models import Hackathon
 from features.hackathons.schemas import (
@@ -81,13 +81,10 @@ async def update_hackathon(
     )
 
 
-@router.delete("/{hackathon_id}", response_model=SuccessResponse[MessageResponse])
+@router.delete("/{hackathon_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_hackathon(
     hackathon_id: uuid.UUID,
     profile: CurrentProfile,
     service: HackathonServiceDep,
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     await service.delete_owned(hackathon_id, profile.id)
-    return SuccessResponse(
-        message="Hackathon deleted successfully.", data=MessageResponse(message="Deleted.")
-    )

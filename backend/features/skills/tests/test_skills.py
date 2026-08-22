@@ -66,6 +66,26 @@ async def test_list_skills_sorted_by_name(
     assert names == ["Ada", "Python", "Zig"]
 
 
+async def test_resubmitting_same_skill_name_is_idempotent(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "skill5@example.com")
+
+    first = await client.post(
+        "/api/v1/skills", headers=headers, json={"name": "Python", "category": "technical"}
+    )
+    second = await client.post(
+        "/api/v1/skills", headers=headers, json={"name": "python", "category": "technical"}
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert first.json()["data"]["id"] == second.json()["data"]["id"]
+
+    list_response = await client.get("/api/v1/skills", headers=headers)
+    assert list_response.json()["meta"]["total"] == 1
+
+
 async def test_users_cannot_access_each_others_skills(
     client: AsyncClient, captured_emails: list[dict[str, str]]
 ) -> None:

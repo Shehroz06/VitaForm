@@ -7,7 +7,7 @@ from fastapi import File as FileParam
 from app.core.base_crud import BaseOwnedCrudService
 from app.core.enums import FilePurpose
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
-from app.schemas.response import MessageResponse, SuccessResponse
+from app.schemas.response import SuccessResponse
 from features.certifications.dependencies import get_certification_service
 from features.certifications.models import Certification
 from features.certifications.schemas import (
@@ -91,16 +91,13 @@ async def update_certification(
     )
 
 
-@router.delete("/{certification_id}", response_model=SuccessResponse[MessageResponse])
+@router.delete("/{certification_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_certification(
     certification_id: uuid.UUID,
     profile: CurrentProfile,
     service: CertificationServiceDep,
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     await service.delete_owned(certification_id, profile.id)
-    return SuccessResponse(
-        message="Certification deleted successfully.", data=MessageResponse(message="Deleted.")
-    )
 
 
 @router.post(
@@ -125,17 +122,14 @@ async def upload_certification_attachment(
     )
 
 
-@router.delete("/{certification_id}/attachment", response_model=SuccessResponse[MessageResponse])
+@router.delete("/{certification_id}/attachment", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_certification_attachment(
     certification_id: uuid.UUID,
     profile: CurrentProfile,
     service: CertificationServiceDep,
     file_service: FileUploadServiceDep,
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     certification = await service.get_owned(certification_id, profile.id)
     if certification.file_id is not None:
         await file_service.delete(certification.file_id, profile.id)
         await service.update_owned(certification_id, profile.id, file_id=None)
-    return SuccessResponse(
-        message="Attachment removed successfully.", data=MessageResponse(message="Deleted.")
-    )

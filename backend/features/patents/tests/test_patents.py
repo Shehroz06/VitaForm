@@ -60,7 +60,7 @@ async def test_get_update_delete_patent_flow(
     assert update_response.json()["data"]["status"] == "granted"
 
     delete_response = await client.delete(f"/api/v1/patents/{patent_id}", headers=headers)
-    assert delete_response.status_code == 200
+    assert delete_response.status_code == 204
 
 
 async def test_users_cannot_access_each_others_patents(

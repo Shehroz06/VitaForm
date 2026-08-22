@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.base_crud import BaseOwnedCrudService
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
-from app.schemas.response import MessageResponse, SuccessResponse
+from app.schemas.response import SuccessResponse
 from features.profiles.dependencies import CurrentProfile
 from features.references.dependencies import get_reference_service
 from features.references.models import Reference
@@ -80,13 +80,10 @@ async def update_reference(
     )
 
 
-@router.delete("/{reference_id}", response_model=SuccessResponse[MessageResponse])
+@router.delete("/{reference_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_reference(
     reference_id: uuid.UUID,
     profile: CurrentProfile,
     service: ReferenceServiceDep,
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     await service.delete_owned(reference_id, profile.id)
-    return SuccessResponse(
-        message="Reference deleted successfully.", data=MessageResponse(message="Deleted.")
-    )

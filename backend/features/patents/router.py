@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.base_crud import BaseOwnedCrudService
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
-from app.schemas.response import MessageResponse, SuccessResponse
+from app.schemas.response import SuccessResponse
 from features.patents.dependencies import get_patent_service
 from features.patents.models import Patent
 from features.patents.schemas import PatentCreateRequest, PatentResponse, PatentUpdateRequest
@@ -77,13 +77,10 @@ async def update_patent(
     )
 
 
-@router.delete("/{patent_id}", response_model=SuccessResponse[MessageResponse])
+@router.delete("/{patent_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_patent(
     patent_id: uuid.UUID,
     profile: CurrentProfile,
     service: PatentServiceDep,
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     await service.delete_owned(patent_id, profile.id)
-    return SuccessResponse(
-        message="Patent deleted successfully.", data=MessageResponse(message="Deleted.")
-    )

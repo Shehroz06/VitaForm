@@ -32,3 +32,7 @@ class ConflictException(AppException):
 
 class BusinessRuleException(AppException):
     status_code = 400
+
+
+class ServiceUnavailableException(AppException):
+    status_code = 503

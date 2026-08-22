@@ -143,7 +143,7 @@ async def test_cover_letter_falls_back_and_lists_history(
     delete_response = await client.delete(
         f"/api/v1/cover-letters/{cover_letter_id}", headers=headers
     )
-    assert delete_response.status_code == 200
+    assert delete_response.status_code == 204
 
 
 async def test_cover_letter_generation_returns_friendly_error_when_all_providers_fail(
@@ -160,7 +160,7 @@ async def test_cover_letter_generation_returns_friendly_error_when_all_providers
         headers=headers,
         json={"company_name": "Acme Corp", "role_title": "Backend Engineer"},
     )
-    assert response.status_code == 400
+    assert response.status_code == 503
     assert response.json()["success"] is False
 
 
@@ -218,7 +218,7 @@ async def test_linkedin_generation_lists_and_deletes_history(
     delete_response = await client.delete(
         f"/api/v1/linkedin-generations/{generation_id}", headers=headers
     )
-    assert delete_response.status_code == 200
+    assert delete_response.status_code == 204
 
     missing_response = await client.get(
         f"/api/v1/linkedin-generations/{generation_id}", headers=headers

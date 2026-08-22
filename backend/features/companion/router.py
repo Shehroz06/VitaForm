@@ -1,11 +1,11 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 
 from app.core.base_crud import BaseOwnedCrudService
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
-from app.schemas.response import MessageResponse, SuccessResponse
+from app.schemas.response import SuccessResponse
 from features.companion.dependencies import (
     get_companion_service,
     get_cover_letter_crud_service,
@@ -74,14 +74,11 @@ async def get_cover_letter(
     )
 
 
-@router.delete("/cover-letters/{cover_letter_id}", response_model=SuccessResponse[MessageResponse])
+@router.delete("/cover-letters/{cover_letter_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_cover_letter(
     cover_letter_id: uuid.UUID, profile: CurrentProfile, service: CoverLetterCrudDep
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     await service.delete_owned(cover_letter_id, profile.id)
-    return SuccessResponse(
-        message="Cover letter deleted successfully.", data=MessageResponse(message="Deleted.")
-    )
 
 
 @router.post("/ai/generate-linkedin", response_model=SuccessResponse[LinkedinGenerationResponse])
@@ -134,13 +131,9 @@ async def get_linkedin_generation(
 
 @router.delete(
     "/linkedin-generations/{linkedin_generation_id}",
-    response_model=SuccessResponse[MessageResponse],
+    status_code=status.HTTP_204_NO_CONTENT,
 )
 async def delete_linkedin_generation(
     linkedin_generation_id: uuid.UUID, profile: CurrentProfile, service: LinkedinCrudDep
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     await service.delete_owned(linkedin_generation_id, profile.id)
-    return SuccessResponse(
-        message="LinkedIn generation deleted successfully.",
-        data=MessageResponse(message="Deleted."),
-    )

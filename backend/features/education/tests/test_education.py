@@ -105,7 +105,7 @@ async def test_get_update_delete_education_flow(
     assert update_response.json()["data"]["grade"] == "3.9"
 
     delete_response = await client.delete(f"/api/v1/education/{education_id}", headers=headers)
-    assert delete_response.status_code == 200
+    assert delete_response.status_code == 204
 
     get_after_delete = await client.get(f"/api/v1/education/{education_id}", headers=headers)
     assert get_after_delete.status_code == 404

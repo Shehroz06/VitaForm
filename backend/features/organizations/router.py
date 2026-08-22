@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.base_crud import BaseOwnedCrudService
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
-from app.schemas.response import MessageResponse, SuccessResponse
+from app.schemas.response import SuccessResponse
 from features.organizations.dependencies import get_organization_service
 from features.organizations.models import Organization
 from features.organizations.schemas import (
@@ -86,13 +86,10 @@ async def update_organization(
     )
 
 
-@router.delete("/{organization_id}", response_model=SuccessResponse[MessageResponse])
+@router.delete("/{organization_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_organization(
     organization_id: uuid.UUID,
     profile: CurrentProfile,
     service: OrganizationServiceDep,
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     await service.delete_owned(organization_id, profile.id)
-    return SuccessResponse(
-        message="Organization deleted successfully.", data=MessageResponse(message="Deleted.")
-    )

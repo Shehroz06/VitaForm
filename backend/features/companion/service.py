@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.settings import Settings
 from app.core.enums import GenerationStatus
-from app.exceptions.base import BusinessRuleException, ResourceNotFoundException
+from app.exceptions.base import ResourceNotFoundException, ServiceUnavailableException
 from features.ai.candidates import load_candidate_items
 from features.ai.context_builder import build_candidates
 from features.ai.models import PromptHistory
@@ -110,7 +110,7 @@ class CompanionService:
                 run_result.attempt_logs,
             )
             await self._db.commit()
-            raise BusinessRuleException(
+            raise ServiceUnavailableException(
                 "AI cover letter generation is temporarily unavailable. Please try again shortly."
             )
 
@@ -167,7 +167,7 @@ class CompanionService:
                 run_result.attempt_logs,
             )
             await self._db.commit()
-            raise BusinessRuleException(
+            raise ServiceUnavailableException(
                 "AI LinkedIn generation is temporarily unavailable. Please try again shortly."
             )
 

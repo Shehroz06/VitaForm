@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -20,11 +20,21 @@ class Company(CrudModelMixin, Base):
 
 class JobDescription(CrudModelMixin, Base):
     __tablename__ = "job_descriptions"
+    __table_args__ = (
+        Index(
+            "ix_job_descriptions_profile_raw_text_hash",
+            "profile_id",
+            "raw_text_hash",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+    )
 
     profile_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("profiles.id"), index=True)
     company_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("companies.id"), default=None)
     title: Mapped[str] = mapped_column(String(200))
     raw_text: Mapped[str] = mapped_column(Text)
+    raw_text_hash: Mapped[str] = mapped_column(String(64), index=True)
     location: Mapped[str | None] = mapped_column(String(150), default=None)
     employment_type: Mapped[EmploymentType | None] = mapped_column(
         pg_enum(EmploymentType, name="employment_type"), default=None

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, UploadFile, status
 from fastapi import File as FileParam
 
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
-from app.schemas.response import MessageResponse, SuccessResponse
+from app.schemas.response import SuccessResponse
 from features.cv_import.dependencies import get_import_service
 from features.cv_import.schemas import (
     ImportConfirmRequest,
@@ -98,12 +98,9 @@ async def reject_import_session(
     )
 
 
-@router.delete("/sessions/{session_id}", response_model=SuccessResponse[MessageResponse])
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_import_session(
     session_id: uuid.UUID, profile: CurrentProfile, service: ImportServiceDep
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     session = await service.get_owned_session(session_id, profile.id)
     await service.delete(session)
-    return SuccessResponse(
-        message="Import session deleted successfully.", data=MessageResponse(message="Deleted.")
-    )

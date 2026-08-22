@@ -7,7 +7,7 @@ from fastapi.responses import RedirectResponse
 
 from app.core.storage import StorageProvider
 from app.exceptions.base import ResourceNotFoundException
-from app.schemas.response import MessageResponse, SuccessResponse
+from app.schemas.response import SuccessResponse
 from features.files.dependencies import (
     get_avatar_service,
     get_file_repository,
@@ -41,15 +41,12 @@ async def upload_avatar(
     )
 
 
-@router.delete("/avatar", response_model=SuccessResponse[MessageResponse])
+@router.delete("/avatar", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_avatar(
     profile: CurrentProfile,
     avatar_service: AvatarServiceDep,
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     await avatar_service.remove_avatar(profile)
-    return SuccessResponse(
-        message="Avatar removed successfully.", data=MessageResponse(message="Deleted.")
-    )
 
 
 @router.get("/{file_id}")
@@ -73,13 +70,10 @@ async def get_file(
     return Response(content=content, media_type=entity.content_type)
 
 
-@router.delete("/{file_id}", response_model=SuccessResponse[MessageResponse])
+@router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_file(
     file_id: uuid.UUID,
     profile: CurrentProfile,
     file_service: FileUploadServiceDep,
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     await file_service.delete(file_id, profile.id)
-    return SuccessResponse(
-        message="File deleted successfully.", data=MessageResponse(message="Deleted.")
-    )

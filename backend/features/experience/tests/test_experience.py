@@ -77,7 +77,7 @@ async def test_update_and_delete_experience(
     assert update_response.json()["data"]["job_title"] == "Senior Engineer"
 
     delete_response = await client.delete(f"/api/v1/experience/{experience_id}", headers=headers)
-    assert delete_response.status_code == 200
+    assert delete_response.status_code == 204
 
     list_response = await client.get("/api/v1/experience", headers=headers)
     assert list_response.json()["meta"]["total"] == 0

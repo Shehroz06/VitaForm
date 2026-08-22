@@ -3,17 +3,17 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
-from app.core.base_crud import BaseOwnedCrudService
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
-from app.schemas.response import MessageResponse, SuccessResponse
+from app.schemas.response import SuccessResponse
 from features.profiles.dependencies import CurrentProfile
 from features.skills.dependencies import get_skill_service
 from features.skills.models import Skill
 from features.skills.schemas import SkillCreateRequest, SkillResponse, SkillUpdateRequest
+from features.skills.service import SkillService
 
 router = APIRouter(prefix="/skills", tags=["skills"])
 
-SkillServiceDep = Annotated[BaseOwnedCrudService[Skill], Depends(get_skill_service)]
+SkillServiceDep = Annotated[SkillService, Depends(get_skill_service)]
 
 
 @router.get("", response_model=SuccessResponse[list[SkillResponse]])
@@ -74,13 +74,10 @@ async def update_skill(
     )
 
 
-@router.delete("/{skill_id}", response_model=SuccessResponse[MessageResponse])
+@router.delete("/{skill_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_skill(
     skill_id: uuid.UUID,
     profile: CurrentProfile,
     service: SkillServiceDep,
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     await service.delete_owned(skill_id, profile.id)
-    return SuccessResponse(
-        message="Skill deleted successfully.", data=MessageResponse(message="Deleted.")
-    )

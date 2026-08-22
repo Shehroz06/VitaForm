@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.base_crud import BaseOwnedCrudService
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
-from app.schemas.response import MessageResponse, SuccessResponse
+from app.schemas.response import SuccessResponse
 from features.languages.dependencies import get_language_service
 from features.languages.models import Language
 from features.languages.schemas import (
@@ -80,13 +80,10 @@ async def update_language(
     )
 
 
-@router.delete("/{language_id}", response_model=SuccessResponse[MessageResponse])
+@router.delete("/{language_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_language(
     language_id: uuid.UUID,
     profile: CurrentProfile,
     service: LanguageServiceDep,
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     await service.delete_owned(language_id, profile.id)
-    return SuccessResponse(
-        message="Language deleted successfully.", data=MessageResponse(message="Deleted.")
-    )

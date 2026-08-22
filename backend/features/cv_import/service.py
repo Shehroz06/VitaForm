@@ -9,6 +9,7 @@ from app.core.enums import GenerationStatus, ImportSessionStatus, SectionType
 from app.exceptions.base import (
     BusinessRuleException,
     ResourceNotFoundException,
+    ServiceUnavailableException,
     ValidationException,
 )
 from features.ai.models import PromptHistory
@@ -90,7 +91,7 @@ class ImportService:
                 profile, prompt_history, GenerationStatus.FAILED, outcome, session.id
             )
             await self._db.commit()
-            raise BusinessRuleException(
+            raise ServiceUnavailableException(
                 "AI CV import is temporarily unavailable. Please try again shortly."
             )
 

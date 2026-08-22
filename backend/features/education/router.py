@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.base_crud import BaseOwnedCrudService
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
-from app.schemas.response import MessageResponse, SuccessResponse
+from app.schemas.response import SuccessResponse
 from features.education.dependencies import get_education_service
 from features.education.models import Education
 from features.education.schemas import (
@@ -81,13 +81,10 @@ async def update_education(
     )
 
 
-@router.delete("/{education_id}", response_model=SuccessResponse[MessageResponse])
+@router.delete("/{education_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_education(
     education_id: uuid.UUID,
     profile: CurrentProfile,
     service: EducationServiceDep,
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     await service.delete_owned(education_id, profile.id)
-    return SuccessResponse(
-        message="Education deleted successfully.", data=MessageResponse(message="Deleted.")
-    )

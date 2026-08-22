@@ -32,8 +32,8 @@ async def test_analyze_job_without_saving(
 
     assert response.status_code == 200
     data = response.json()["data"]
-    assert "python" in data["required_skills"]
-    assert "kubernetes" in data["preferred_skills"]
+    assert "Python" in data["required_skills"]
+    assert "Kubernetes" in data["preferred_skills"]
 
 
 async def test_create_job_saves_with_analysis_and_company(
@@ -57,7 +57,7 @@ async def test_create_job_saves_with_analysis_and_company(
     assert data["title"] == "Backend Engineer"
     assert data["company_id"] is not None
     assert data["company_name"] == "Acme Corp"
-    assert "python" in data["required_skills"]
+    assert "Python" in data["required_skills"]
 
 
 async def test_saving_two_jobs_for_same_company_reuses_the_company(
@@ -75,12 +75,36 @@ async def test_saving_two_jobs_for_same_company_reuses_the_company(
         headers=headers,
         json={
             "title": "Senior Backend Engineer",
-            "raw_text": _JD_TEXT,
+            "raw_text": _JD_TEXT + "\n- Leads a small team",
             "company_name": "Acme Corp",
         },
     )
 
     assert first.json()["data"]["company_id"] == second.json()["data"]["company_id"]
+
+
+async def test_resubmitting_same_job_text_is_idempotent(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "jobs9@example.com")
+
+    first = await client.post(
+        "/api/v1/jobs",
+        headers=headers,
+        json={"title": "Backend Engineer", "raw_text": _JD_TEXT, "company_name": "Acme Corp"},
+    )
+    second = await client.post(
+        "/api/v1/jobs",
+        headers=headers,
+        json={"title": "Backend Engineer", "raw_text": _JD_TEXT, "company_name": "Acme Corp"},
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert first.json()["data"]["id"] == second.json()["data"]["id"]
+
+    list_response = await client.get("/api/v1/jobs", headers=headers)
+    assert list_response.json()["meta"]["total"] == 1
 
 
 async def test_get_update_delete_job_flow(
@@ -96,7 +120,7 @@ async def test_get_update_delete_job_flow(
     assert get_response.status_code == 200
 
     delete_response = await client.delete(f"/api/v1/jobs/{job_id}", headers=headers)
-    assert delete_response.status_code == 200
+    assert delete_response.status_code == 204
 
     missing_response = await client.get(f"/api/v1/jobs/{job_id}", headers=headers)
     assert missing_response.status_code == 404
@@ -146,7 +170,7 @@ async def test_ats_score_against_matching_profile(
     assert score_response.status_code == 200
     data = score_response.json()["data"]
     assert data["overall_score"] > 0
-    assert "python" in data["matched_skills"]
+    assert "Python" in data["matched_skills"]
 
     latest_response = await client.get(f"/api/v1/jobs/{job_id}/ats-score", headers=headers)
     assert latest_response.status_code == 200
@@ -178,5 +202,5 @@ async def test_ats_score_flags_missing_skills_for_unrelated_profile(
     score_response = await client.post(f"/api/v1/jobs/{job_id}/ats-score", headers=headers)
     data = score_response.json()["data"]
     assert data["overall_score"] < 50
-    assert "python" in data["missing_skills"]
+    assert "Python" in data["missing_skills"]
     assert len(data["recommendations"]) > 0

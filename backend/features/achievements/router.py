@@ -7,7 +7,7 @@ from fastapi import File as FileParam
 from app.core.base_crud import BaseOwnedCrudService
 from app.core.enums import FilePurpose
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
-from app.schemas.response import MessageResponse, SuccessResponse
+from app.schemas.response import SuccessResponse
 from features.achievements.dependencies import get_achievement_service
 from features.achievements.models import Achievement
 from features.achievements.schemas import (
@@ -91,16 +91,13 @@ async def update_achievement(
     )
 
 
-@router.delete("/{achievement_id}", response_model=SuccessResponse[MessageResponse])
+@router.delete("/{achievement_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_achievement(
     achievement_id: uuid.UUID,
     profile: CurrentProfile,
     service: AchievementServiceDep,
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     await service.delete_owned(achievement_id, profile.id)
-    return SuccessResponse(
-        message="Achievement deleted successfully.", data=MessageResponse(message="Deleted.")
-    )
 
 
 @router.post("/{achievement_id}/attachment", response_model=SuccessResponse[AchievementResponse])
@@ -123,17 +120,14 @@ async def upload_achievement_attachment(
     )
 
 
-@router.delete("/{achievement_id}/attachment", response_model=SuccessResponse[MessageResponse])
+@router.delete("/{achievement_id}/attachment", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_achievement_attachment(
     achievement_id: uuid.UUID,
     profile: CurrentProfile,
     service: AchievementServiceDep,
     file_service: FileUploadServiceDep,
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     achievement = await service.get_owned(achievement_id, profile.id)
     if achievement.file_id is not None:
         await file_service.delete(achievement.file_id, profile.id)
         await service.update_owned(achievement_id, profile.id, file_id=None)
-    return SuccessResponse(
-        message="Attachment removed successfully.", data=MessageResponse(message="Deleted.")
-    )

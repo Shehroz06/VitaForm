@@ -96,7 +96,7 @@ async def test_delete_avatar_clears_profile_avatar_url(
     )
 
     delete_response = await client.delete("/api/v1/files/avatar", headers=headers)
-    assert delete_response.status_code == 200
+    assert delete_response.status_code == 204
 
     profile_response = await client.get("/api/v1/profiles/me", headers=headers)
     assert profile_response.json()["data"]["avatar_url"] is None
@@ -169,7 +169,7 @@ async def test_certification_attachment_upload_and_delete_flow(
     delete_response = await client.delete(
         f"/api/v1/certifications/{certification_id}/attachment", headers=headers
     )
-    assert delete_response.status_code == 200
+    assert delete_response.status_code == 204
 
     get_response = await client.get(
         f"/api/v1/certifications/{certification_id}", headers=headers
@@ -219,7 +219,7 @@ async def test_achievement_attachment_upload_and_delete_flow(
     delete_response = await client.delete(
         f"/api/v1/achievements/{achievement_id}/attachment", headers=headers
     )
-    assert delete_response.status_code == 200
+    assert delete_response.status_code == 204
 
     get_response = await client.get(f"/api/v1/achievements/{achievement_id}", headers=headers)
     assert get_response.json()["data"]["file_id"] is None

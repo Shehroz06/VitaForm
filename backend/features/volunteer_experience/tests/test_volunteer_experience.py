@@ -67,7 +67,7 @@ async def test_get_update_delete_volunteer_experience_flow(
     delete_response = await client.delete(
         f"/api/v1/volunteer-experience/{entry_id}", headers=headers
     )
-    assert delete_response.status_code == 200
+    assert delete_response.status_code == 204
 
 
 async def test_users_cannot_access_each_others_volunteer_experience(

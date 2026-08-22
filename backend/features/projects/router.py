@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, status
 from app.core.base_crud import BaseOwnedCrudService
 from app.exceptions.base import ValidationException
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
-from app.schemas.response import MessageResponse, SuccessResponse
+from app.schemas.response import SuccessResponse
 from features.profiles.dependencies import CurrentProfile
 from features.projects.dependencies import get_project_repository, get_project_service
 from features.projects.models import Project
@@ -96,13 +96,10 @@ async def update_project(
     )
 
 
-@router.delete("/{project_id}", response_model=SuccessResponse[MessageResponse])
+@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(
     project_id: uuid.UUID,
     profile: CurrentProfile,
     service: ProjectServiceDep,
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     await service.delete_owned(project_id, profile.id)
-    return SuccessResponse(
-        message="Project deleted successfully.", data=MessageResponse(message="Deleted.")
-    )

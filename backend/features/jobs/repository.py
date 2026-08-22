@@ -35,6 +35,20 @@ class JobDescriptionRepository(BaseRepository[JobDescription]):
         )
         return (await self._db.execute(stmt)).scalar_one_or_none()
 
+    async def get_by_hash(
+        self, profile_id: uuid.UUID, raw_text_hash: str
+    ) -> JobDescription | None:
+        stmt = (
+            select(JobDescription)
+            .where(
+                JobDescription.profile_id == profile_id,
+                JobDescription.raw_text_hash == raw_text_hash,
+                JobDescription.deleted_at.is_(None),
+            )
+            .options(selectinload(JobDescription.company))
+        )
+        return (await self._db.execute(stmt)).scalar_one_or_none()
+
     async def list_by_owner(
         self,
         owner_column: InstrumentedAttribute[uuid.UUID],

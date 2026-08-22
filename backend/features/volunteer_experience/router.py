@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.base_crud import BaseOwnedCrudService
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
-from app.schemas.response import MessageResponse, SuccessResponse
+from app.schemas.response import SuccessResponse
 from features.profiles.dependencies import CurrentProfile
 from features.volunteer_experience.dependencies import get_volunteer_experience_service
 from features.volunteer_experience.models import VolunteerExperience
@@ -88,14 +88,10 @@ async def update_volunteer_experience(
     )
 
 
-@router.delete("/{entry_id}", response_model=SuccessResponse[MessageResponse])
+@router.delete("/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_volunteer_experience(
     entry_id: uuid.UUID,
     profile: CurrentProfile,
     service: VolunteerExperienceServiceDep,
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     await service.delete_owned(entry_id, profile.id)
-    return SuccessResponse(
-        message="Volunteer experience deleted successfully.",
-        data=MessageResponse(message="Deleted."),
-    )

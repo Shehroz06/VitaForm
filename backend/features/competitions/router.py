@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.base_crud import BaseOwnedCrudService
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
-from app.schemas.response import MessageResponse, SuccessResponse
+from app.schemas.response import SuccessResponse
 from features.competitions.dependencies import get_competition_service
 from features.competitions.models import Competition
 from features.competitions.schemas import (
@@ -86,13 +86,10 @@ async def update_competition(
     )
 
 
-@router.delete("/{competition_id}", response_model=SuccessResponse[MessageResponse])
+@router.delete("/{competition_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_competition(
     competition_id: uuid.UUID,
     profile: CurrentProfile,
     service: CompetitionServiceDep,
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     await service.delete_owned(competition_id, profile.id)
-    return SuccessResponse(
-        message="Competition deleted successfully.", data=MessageResponse(message="Deleted.")
-    )

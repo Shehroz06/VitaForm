@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.base_crud import BaseOwnedCrudService
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
-from app.schemas.response import MessageResponse, SuccessResponse
+from app.schemas.response import SuccessResponse
 from features.leadership_roles.dependencies import get_leadership_role_service
 from features.leadership_roles.models import LeadershipRole
 from features.leadership_roles.schemas import (
@@ -88,13 +88,10 @@ async def update_leadership_role(
     )
 
 
-@router.delete("/{role_id}", response_model=SuccessResponse[MessageResponse])
+@router.delete("/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_leadership_role(
     role_id: uuid.UUID,
     profile: CurrentProfile,
     service: LeadershipRoleServiceDep,
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     await service.delete_owned(role_id, profile.id)
-    return SuccessResponse(
-        message="Leadership role deleted successfully.", data=MessageResponse(message="Deleted.")
-    )

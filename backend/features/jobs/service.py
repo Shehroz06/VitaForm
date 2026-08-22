@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 
 from sqlalchemy import select
@@ -28,6 +29,13 @@ class JobService:
     async def create_job(
         self, profile_id: uuid.UUID, data: JobDescriptionCreateRequest
     ) -> JobDescription:
+        raw_text_hash = hashlib.sha256(data.raw_text.encode("utf-8")).hexdigest()
+        existing = await self._jobs.get_by_hash(profile_id, raw_text_hash)
+        if existing is not None:
+            # Resubmitting the exact same JD text is a no-op, not a new
+            # posting -- return the saved analysis instead of duplicating it.
+            return existing
+
         company = None
         if data.company_name:
             company = await self._companies.get_or_create_by_name(profile_id, data.company_name)
@@ -38,6 +46,7 @@ class JobService:
             company_id=company.id if company else None,
             title=data.title,
             raw_text=data.raw_text,
+            raw_text_hash=raw_text_hash,
             location=data.location,
             employment_type=data.employment_type,
             keywords=analysis.keywords,

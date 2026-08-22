@@ -147,7 +147,7 @@ async def test_delete_project(client: AsyncClient, captured_emails: list[dict[st
     project_id = create_response.json()["data"]["id"]
 
     delete_response = await client.delete(f"/api/v1/projects/{project_id}", headers=headers)
-    assert delete_response.status_code == 200
+    assert delete_response.status_code == 204
 
     get_response = await client.get(f"/api/v1/projects/{project_id}", headers=headers)
     assert get_response.status_code == 404

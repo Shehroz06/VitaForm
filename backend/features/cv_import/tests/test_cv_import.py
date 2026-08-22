@@ -84,7 +84,7 @@ async def test_create_session_records_failure_when_provider_unavailable(
         files={"file": ("resume.pdf", build_sample_pdf(), "application/pdf")},
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 503
     assert response.json()["success"] is False
 
 

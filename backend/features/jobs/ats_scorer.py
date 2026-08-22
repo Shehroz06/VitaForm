@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from features.ai.ranking import extract_keywords
 from features.jobs.schemas import JobAnalysis
+from features.jobs.skills_taxonomy import canonicalize, match_skills
 
 _MAX_LISTED_SKILLS = 10
 
@@ -17,17 +17,21 @@ class AtsResult:
 def compute_ats_score(
     analysis: JobAnalysis, profile_skill_names: set[str], profile_text: str
 ) -> AtsResult:
-    profile_keywords = extract_keywords(profile_text) | {
-        name.lower() for name in profile_skill_names
+    # Canonicalize both sides through the same taxonomy so "React.js" in a
+    # profile's Skills list and "React" in a job description count as the
+    # same skill. A profile skill outside the taxonomy still counts under
+    # its own normalized name rather than being silently dropped.
+    profile_skills = match_skills(profile_text) | {
+        canonicalize(name) for name in profile_skill_names
     }
 
     required = set(analysis.required_skills)
     preferred = set(analysis.preferred_skills)
 
-    matched_required = required & profile_keywords
-    matched_preferred = preferred & profile_keywords
-    missing_required = required - profile_keywords
-    missing_preferred = preferred - profile_keywords
+    matched_required = required & profile_skills
+    matched_preferred = preferred & profile_skills
+    missing_required = required - profile_skills
+    missing_preferred = preferred - profile_skills
 
     total_weight = len(required) * 2 + len(preferred)
     matched_weight = len(matched_required) * 2 + len(matched_preferred)

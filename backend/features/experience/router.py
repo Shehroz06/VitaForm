@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.base_crud import BaseOwnedCrudService
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
-from app.schemas.response import MessageResponse, SuccessResponse
+from app.schemas.response import SuccessResponse
 from features.experience.dependencies import get_experience_service
 from features.experience.models import Experience
 from features.experience.schemas import (
@@ -86,13 +86,10 @@ async def update_experience(
     )
 
 
-@router.delete("/{experience_id}", response_model=SuccessResponse[MessageResponse])
+@router.delete("/{experience_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_experience(
     experience_id: uuid.UUID,
     profile: CurrentProfile,
     service: ExperienceServiceDep,
-) -> SuccessResponse[MessageResponse]:
+) -> None:
     await service.delete_owned(experience_id, profile.id)
-    return SuccessResponse(
-        message="Experience deleted successfully.", data=MessageResponse(message="Deleted.")
-    )
