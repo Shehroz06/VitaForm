@@ -205,7 +205,7 @@ function ProjectDialogContent({
   };
 
   return (
-    <DialogContent className="max-h-[85vh] overflow-y-auto">
+    <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
       <DialogHeader>
         <DialogTitle>{editing ? "Edit project" : "Add project"}</DialogTitle>
       </DialogHeader>
@@ -219,28 +219,20 @@ function ProjectDialogContent({
           <Label htmlFor="description">Description</Label>
           <Textarea id="description" rows={3} {...register("description")} />
         </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="demo_url">URL</Label>
-          <Input id="demo_url" placeholder="https://" {...register("demo_url")} />
-          {errors.demo_url && <p className="text-sm text-destructive">{errors.demo_url.message}</p>}
-        </div>
-
-        {availableSkills && availableSkills.length > 0 && (
+        <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1.5">
-            <Label>Skills used (optional)</Label>
-            <div className="flex flex-wrap gap-3 rounded-xl bg-card p-3.5 ring-1 ring-foreground/10">
-              {availableSkills.map((skill) => (
-                <label key={skill.id} className="flex items-center gap-1.5 text-sm">
-                  <Checkbox
-                    checked={skillIds.includes(skill.id)}
-                    onCheckedChange={(checked) => toggleSkill(skill.id, checked === true)}
-                  />
-                  {skill.name}
-                </label>
-              ))}
-            </div>
+            <Label htmlFor="repository_url">GitHub URL</Label>
+            <Input id="repository_url" placeholder="https://" {...register("repository_url")} />
+            {errors.repository_url && (
+              <p className="text-sm text-destructive">{errors.repository_url.message}</p>
+            )}
           </div>
-        )}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="demo_url">Live URL</Label>
+            <Input id="demo_url" placeholder="https://" {...register("demo_url")} />
+            {errors.demo_url && <p className="text-sm text-destructive">{errors.demo_url.message}</p>}
+          </div>
+        </div>
 
         <button
           type="button"
@@ -290,13 +282,6 @@ function ProjectDialogContent({
                 )}
               </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="repository_url">Repository URL</Label>
-              <Input id="repository_url" placeholder="https://" {...register("repository_url")} />
-              {errors.repository_url && (
-                <p className="text-sm text-destructive">{errors.repository_url.message}</p>
-              )}
-            </div>
             <label className="flex items-center gap-2 text-sm">
               <Checkbox
                 checked={isPinned}
@@ -306,6 +291,24 @@ function ProjectDialogContent({
             </label>
           </div>
         )}
+
+        {availableSkills && availableSkills.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <Label>Skills used (optional)</Label>
+            <div className="flex flex-wrap gap-3 rounded-xl bg-card p-3.5 ring-1 ring-foreground/10">
+              {availableSkills.map((skill) => (
+                <label key={skill.id} className="flex items-center gap-1.5 text-sm">
+                  <Checkbox
+                    checked={skillIds.includes(skill.id)}
+                    onCheckedChange={(checked) => toggleSkill(skill.id, checked === true)}
+                  />
+                  {skill.name}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
         <DialogFooter>
           <Button type="submit" disabled={isPending}>
             {isPending ? "Saving..." : "Save"}
