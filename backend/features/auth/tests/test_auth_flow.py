@@ -179,3 +179,57 @@ async def test_forgot_password_for_unknown_email_still_returns_200(client: Async
     )
 
     assert response.status_code == 200
+
+
+async def test_register_normalizes_email_to_lowercase(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/v1/auth/register",
+        json={"email": "MixedCase@Example.com", "password": "password123"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["data"]["email"] == "mixedcase@example.com"
+
+
+async def test_duplicate_registration_is_case_insensitive(client: AsyncClient) -> None:
+    await client.post(
+        "/api/v1/auth/register",
+        json={"email": "CaseDupe@Example.com", "password": "password123"},
+    )
+
+    response = await client.post(
+        "/api/v1/auth/register",
+        json={"email": "casedupe@example.com", "password": "password123"},
+    )
+
+    assert response.status_code == 409
+
+
+async def test_login_is_case_insensitive_for_email(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    register_response = await client.post(
+        "/api/v1/auth/register",
+        json={"email": "CaseLogin@Example.com", "password": "password123"},
+    )
+    assert register_response.status_code == 201
+
+    # The email was normalized to lowercase at registration, so it's what
+    # the verification email actually goes to -- confirms the same
+    # normalization AuthRepository does isn't just a login-time coincidence.
+    verification_email = next(
+        e for e in captured_emails if e["to"] == "caselogin@example.com"
+    )
+    token = extract_token(verification_email["body"])
+    verify_response = await client.post("/api/v1/auth/verify-email", json={"token": token})
+    assert verify_response.status_code == 200
+
+    # Logging in with different casing than either the original submission
+    # or the stored (lowercase) value must still succeed.
+    response = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "CASELOGIN@EXAMPLE.COM", "password": "password123"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["access_token"]

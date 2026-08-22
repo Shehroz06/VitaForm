@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, String, Table
+from sqlalchemy import Column, DateTime, ForeignKey, Index, String, Table, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -28,8 +28,14 @@ role_permissions = Table(
 
 class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "users"
+    # Case-insensitive uniqueness at the DB level, not just application code
+    # (AuthRepository normalizes to lowercase before every write/read, but
+    # this is the hard guarantee that survives even if some future code
+    # path forgets to) -- same functional-index pattern as skills' unique
+    # (profile_id, lower(name)).
+    __table_args__ = (Index("ix_users_lower_email", text("lower(email)"), unique=True),)
 
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    email: Mapped[str] = mapped_column(String(255))
     password_hash: Mapped[str] = mapped_column(String(255))
     first_name: Mapped[str | None] = mapped_column(String(100), default=None)
     last_name: Mapped[str | None] = mapped_column(String(100), default=None)

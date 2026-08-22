@@ -15,13 +15,28 @@ from features.auth.models import (
 )
 
 
+def _normalize_email(email: str) -> str:
+    """Email is case-insensitive in practice everywhere (RFC 5321 leaves
+    the local part technically case-sensitive, but no mail provider
+    actually enforces that, and every real system -- including this one's
+    own login form -- treats "User@Example.com" and "user@example.com" as
+    the same address). Normalizing at both write time (create_user) and
+    read time (get_user_by_email) is what makes that true here: without
+    it, a user who types a different case at login than at signup gets a
+    false "invalid credentials", and the "unique" email constraint doesn't
+    actually stop two case-variant registrations of the same address."""
+    return email.strip().lower()
+
+
 class AuthRepository:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
     async def get_user_by_email(self, email: str) -> User | None:
         result = await self._db.execute(
-            select(User).where(User.email == email).options(selectinload(User.roles))
+            select(User)
+            .where(User.email == _normalize_email(email))
+            .options(selectinload(User.roles))
         )
         return result.scalar_one_or_none()
 
@@ -44,7 +59,7 @@ class AuthRepository:
         roles: list[Role],
     ) -> User:
         user = User(
-            email=email,
+            email=_normalize_email(email),
             password_hash=password_hash,
             first_name=first_name,
             last_name=last_name,
