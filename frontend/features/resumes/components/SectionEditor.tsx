@@ -500,6 +500,16 @@ export function SummaryEditor({
       canMoveUp={canMoveUp}
       canMoveDown={canMoveDown}
     >
+      <Input
+        value={section.custom_title ?? ""}
+        placeholder="Summary"
+        onChange={(event) =>
+          onSectionChange({ ...section, custom_title: event.target.value || null })
+        }
+        className="h-8 max-w-xs"
+        aria-label="Section title"
+      />
+
       <Label htmlFor="resume-summary" className="sr-only">
         Summary
       </Label>
@@ -523,7 +533,7 @@ export function SummaryEditor({
         value={summary}
         onChange={(event) => onSummaryChange(event.target.value)}
         rows={4}
-        placeholder="A short professional summary..."
+        placeholder="A short summary, research interests, or objective..."
         className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
     </SectionCardShell>
