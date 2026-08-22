@@ -574,6 +574,41 @@ async def test_preview_with_renders_unsaved_content_against_a_candidate_template
     assert unchanged_response.json()["data"]["template_id"] == classic_id
 
 
+async def test_template_sample_preview_renders_the_callers_own_profile(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    """The pre-resume-creation template browser's preview -- no resume_id
+    involved at all, just the caller's own profile data against whichever
+    template they're looking at."""
+    headers = await _auth(client, captured_emails, "templateSample1@example.com")
+    template_id = await _classic_template_id(client)
+
+    await client.post(
+        "/api/v1/education",
+        headers=headers,
+        json={
+            "institution_name": "Sample University",
+            "degree": "BSc",
+            "start_date": "2018-01-01",
+            "is_current": False,
+        },
+    )
+
+    response = await client.post(
+        f"/api/v1/resume-templates/{template_id}/preview", headers=headers, json={}
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    assert response.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+async def test_template_sample_preview_requires_auth(client: AsyncClient) -> None:
+    template_id = "00000000-0000-0000-0000-000000000000"
+    response = await client.post(f"/api/v1/resume-templates/{template_id}/preview", json={})
+    assert response.status_code == 401
+
+
 async def test_preview_resume_requires_ownership(
     client: AsyncClient, captured_emails: list[dict[str, str]]
 ) -> None:

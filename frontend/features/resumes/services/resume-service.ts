@@ -6,6 +6,7 @@ import type {
   ResumeContent,
   ResumeCreatePayload,
   ResumeGeneratePayload,
+  ResumeStyle,
   ResumeTemplate,
   ResumeUpdatePayload,
   ResumeVersion,
@@ -17,6 +18,12 @@ import { apiClient } from "@/services/api-client";
 
 export const resumeTemplateService = {
   list: () => apiClient.get<ResumeTemplate[]>("/resume-templates"),
+  // Real backend render of the given template filled with the caller's own
+  // profile -- used by the pre-resume-creation template browser, which has
+  // no resume yet to scope a preview to (see resumeService.previewWith for
+  // the equivalent once a resume exists).
+  previewSample: (templateId: string, style: ResumeStyle) =>
+    apiClient.postBlob(`/resume-templates/${templateId}/preview`, { style }),
 };
 
 export const resumeService = {

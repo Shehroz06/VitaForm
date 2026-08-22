@@ -1,15 +1,68 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CheckIcon, LayoutTemplate } from "lucide-react";
+import { CheckIcon, LayoutTemplate, Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { TemplateMockup } from "@/components/marketing/TemplateMockup";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useResumeTemplates } from "@/features/resumes/hooks/use-resumes";
+import { useResumeTemplates, useTemplateSamplePreview } from "@/features/resumes/hooks/use-resumes";
+import { getTemplateDefinition } from "@/features/resumes/templates/registry";
 import { ACCENT_OPTIONS } from "@/features/resumes/templates/style-options";
+import { configToStyle } from "@/features/resumes/style-mapping";
 import { cn } from "@/lib/utils";
+
+/** A real backend render of the selected template filled with the user's
+ * own profile (see resumeTemplateService.previewSample) -- there's no
+ * resume yet at this point in the flow, so this is the one place a real
+ * preview has to come from the profile directly rather than a saved
+ * resume's content. */
+function SamplePreview({
+  templateId,
+  slug,
+  accent,
+}: {
+  templateId: string;
+  slug: string;
+  accent: string;
+}) {
+  const style = configToStyle({ ...getTemplateDefinition(slug).defaultConfig, accentColor: accent });
+  const { data, isFetching, isError } = useTemplateSamplePreview(templateId, style, true);
+
+  const imageUrl = useMemo(() => {
+    if (!data) return null;
+    try {
+      return URL.createObjectURL(data.blob);
+    } catch {
+      return null;
+    }
+  }, [data]);
+
+  useEffect(() => {
+    return () => {
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
+    };
+  }, [imageUrl]);
+
+  return (
+    <div className="relative aspect-[210/297] w-full overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-black/10">
+      {imageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element -- fetched, authenticated blob URL, not a static asset
+        <img src={imageUrl} alt="" className="h-full w-full object-cover object-top" />
+      )}
+      {!imageUrl && isFetching && (
+        <div className="flex h-full w-full items-center justify-center">
+          <Loader2 className="size-6 animate-spin text-neutral-400" />
+        </div>
+      )}
+      {!imageUrl && isError && (
+        <div className="flex h-full w-full items-center justify-center p-4 text-center text-sm text-neutral-500">
+          Preview failed to render.
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function TemplatesPage() {
   const { data: templates, isLoading } = useResumeTemplates();
@@ -100,7 +153,7 @@ export default function TemplatesPage() {
               <p className="text-xs text-muted-foreground">{selected.name}</p>
             </div>
             <div className="mx-auto flex w-full max-w-[330px] flex-1 flex-col justify-center">
-              <TemplateMockup slug={selected.slug} accent={accent} />
+              <SamplePreview templateId={selected.id} slug={selected.slug} accent={accent} />
             </div>
             <Button asChild className="w-full sm:w-fit sm:self-center">
               <Link href={`/resumes?templateId=${selected.id}&accentColor=${encodeURIComponent(accent)}`}>

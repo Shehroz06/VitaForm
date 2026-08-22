@@ -34,6 +34,7 @@ from features.resumes.schemas import (
     ResumeVersionSummaryResponse,
     RewriteTextRequest,
     RewriteTextResponse,
+    TemplateSampleRequest,
 )
 from features.resumes.service import ResumeService
 
@@ -71,6 +72,27 @@ async def list_resume_templates(
     return SuccessResponse(
         message="Resume templates retrieved successfully.",
         data=[ResumeTemplateResponse.model_validate(t) for t in templates],
+    )
+
+
+@router.post("/resume-templates/{template_id}/preview")
+async def preview_resume_template(
+    template_id: uuid.UUID,
+    data: TemplateSampleRequest,
+    profile: CurrentProfile,
+    user: CurrentUser,
+    export_service: ResumeExportServiceDep,
+) -> Response:
+    """Real render of a candidate template filled with the caller's own
+    profile -- the template browser's preview, before any resume exists to
+    scope a render to (see PreviewWithRequest for the equivalent once one
+    does). Authenticated: this triggers a real pdflatex/WeasyPrint compile,
+    which is too expensive to expose without auth."""
+    png_bytes = await export_service.render_template_sample_image(
+        profile, template_id, data.style, user.email, _full_name(user.first_name, user.last_name)
+    )
+    return Response(
+        content=png_bytes, media_type="image/png", headers={"Cache-Control": "no-store"}
     )
 
 

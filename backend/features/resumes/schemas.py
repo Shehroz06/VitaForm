@@ -78,6 +78,15 @@ class ResumeContent(BaseModel):
     subtitle_overrides: dict[str, str] = Field(default_factory=dict)
 
 
+class TemplateSampleRequest(BaseModel):
+    """Renders the caller's own profile (every item, across every section)
+    against a candidate template -- the pre-resume-creation template
+    browser's real-render equivalent of PreviewWithRequest, which needs an
+    existing resume_id this flow doesn't have yet."""
+
+    style: ResumeStyle = Field(default_factory=ResumeStyle)
+
+
 class PreviewWithRequest(BaseModel):
     """Renders arbitrary, not-yet-saved content against a candidate
     template -- nothing here is persisted. Powers the template picker's
