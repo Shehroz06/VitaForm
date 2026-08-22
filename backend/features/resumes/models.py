@@ -6,7 +6,8 @@ from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstr
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database.base import Base, CrudModelMixin
+from app.core.enums import RenderEngine
+from app.database.base import Base, CrudModelMixin, pg_enum
 
 
 class ResumeTemplate(CrudModelMixin, Base):
@@ -16,6 +17,9 @@ class ResumeTemplate(CrudModelMixin, Base):
     name: Mapped[str] = mapped_column(String(100))
     description: Mapped[str | None] = mapped_column(Text, default=None)
     is_active: Mapped[bool] = mapped_column(default=True)
+    render_engine: Mapped[RenderEngine] = mapped_column(
+        pg_enum(RenderEngine, "render_engine"), default=RenderEngine.HTML
+    )
 
 
 class Resume(CrudModelMixin, Base):

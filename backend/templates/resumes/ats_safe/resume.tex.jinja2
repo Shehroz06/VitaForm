@@ -1,0 +1,238 @@
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[hidelinks]{hyperref}
+\usepackage{enumitem}
+\usepackage[letterpaper,margin=\VAR{margin_in}in]{geometry}
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\raggedbottom
+\raggedright
+
+% The rule sits 2pt below the title and the vspace after it nets back to
+% *zero* extra pull (matching the +2pt push-down, not overshooting it) --
+% \titlespacing's "after" value below is the only thing controlling the
+% gap to the next line. A larger negative pull here (this used to be
+% -4pt) can exceed that "after" value at tight density/compact spacing,
+% dragging the rule up into the following text instead of under the title.
+\titleformat{\section}{\bfseries\fontsize{\VAR{(body_pt + 1.5) | round(1)}}{\VAR{(body_pt + 3) | round(1)}}\selectfont}{}{0em}{}[\vspace{2pt}\titlerule\vspace{-2pt}]
+\titlespacing{\section}{0pt}{\VAR{section_gap_pt}pt}{\VAR{section_after_gap_pt}pt}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{\VAR{item_sep_pt}pt}
+  \begin{tabular*}{\linewidth}{@{}l@{\extracolsep{\fill}}r@{}}
+    \textbf{#1} & #2 \\
+    \textit{\small #3} & \textit{\small #4} \\
+  \end{tabular*}\vspace{-2pt}
+}
+
+\newcommand{\resumeEntryHeading}[2]{
+  \vspace{\VAR{item_sep_pt}pt}
+  \begin{tabular*}{\linewidth}{@{}l@{\extracolsep{\fill}}r@{}}
+    \textbf{#1} & #2 \\
+  \end{tabular*}
+}
+
+\begin{document}
+\fontsize{\VAR{body_pt}}{\VAR{(body_pt * 1.18) | round(2)}}\selectfont
+
+\begin{center}
+  {\fontsize{\VAR{name_pt}}{\VAR{(name_pt * 1.1) | round(2)}}\selectfont\bfseries \VAR{full_name | latex_escape}} \\
+  \vspace{2pt}
+  \small
+  \BLOCK{set contact_parts = []}
+  \BLOCK{if contact_visibility.location and profile.location}
+    \BLOCK{set _ = contact_parts.append(profile.location | latex_escape)}
+  \BLOCK{endif}
+  \BLOCK{if contact_visibility.phone and profile.phone}
+    \BLOCK{set _ = contact_parts.append(profile.phone | latex_escape)}
+  \BLOCK{endif}
+  \BLOCK{if contact_visibility.email}
+    \BLOCK{set _ = contact_parts.append("\\href{mailto:" ~ (email | latex_safe_url) ~ "}{" ~ (email | latex_escape) ~ "}")}
+  \BLOCK{endif}
+  \BLOCK{if contact_visibility.linkedin and profile.linkedin_url}
+    \BLOCK{set _ = contact_parts.append("\\href{" ~ (profile.linkedin_url | latex_safe_url) ~ "}{LinkedIn}")}
+  \BLOCK{endif}
+  \BLOCK{if contact_visibility.github and profile.github_url}
+    \BLOCK{set _ = contact_parts.append("\\href{" ~ (profile.github_url | latex_safe_url) ~ "}{GitHub}")}
+  \BLOCK{endif}
+  \BLOCK{if contact_visibility.website and profile.website_url}
+    \BLOCK{set _ = contact_parts.append("\\href{" ~ (profile.website_url | latex_safe_url) ~ "}{Portfolio}")}
+  \BLOCK{endif}
+  \VAR{contact_parts | join(" $|$ ")}
+\end{center}
+
+\BLOCK{for section in sections}
+\BLOCK{if section.type == "summary"}
+\section*{\VAR{section.title | latex_escape}}
+\VAR{section.text | format_paragraph}
+
+\BLOCK{elif section.type == "education"}
+\section*{\VAR{section.title | latex_escape}}
+\BLOCK{for item in section.entries}
+\resumeSubheading
+  {\VAR{item.institution_name | latex_escape}}
+  {\VAR{item.start_date.strftime("%b %Y") if item.start_date else ""} -- \VAR{"Present" if item.is_current else (item.end_date.strftime("%b %Y") if item.end_date else "")}}
+  {\VAR{item.degree | latex_escape}\BLOCK{if item.field_of_study}, \VAR{item.field_of_study | latex_escape}\BLOCK{endif}\BLOCK{if item.grade} \textperiodcentered\ \VAR{item.grade | latex_escape}\BLOCK{endif}}
+  { }
+\BLOCK{if item.description}\VAR{item.description | format_description}\BLOCK{endif}
+\BLOCK{endfor}
+
+\BLOCK{elif section.type == "experience"}
+\section*{\VAR{section.title | latex_escape}}
+\BLOCK{for item in section.entries}
+\resumeSubheading
+  {\VAR{item.job_title | latex_escape} \textperiodcentered\ \VAR{item.company_name | latex_escape}}
+  {\VAR{item.start_date.strftime("%b %Y") if item.start_date else ""} -- \VAR{"Present" if item.is_current else (item.end_date.strftime("%b %Y") if item.end_date else "")}}
+  {\VAR{item.employment_type.value.replace("_", " ").title() | latex_escape}\BLOCK{if item.location} \textperiodcentered\ \VAR{item.location | latex_escape}\BLOCK{endif}}
+  { }
+\BLOCK{if item.description}\VAR{item.description | format_description}\BLOCK{endif}
+\BLOCK{endfor}
+
+\BLOCK{elif section.type == "projects"}
+\section*{\VAR{section.title | latex_escape}}
+\BLOCK{for item in section.entries}
+\resumeEntryHeading
+  {\VAR{item.title | latex_escape}\BLOCK{if item.role} \textperiodcentered\ \textit{\small \VAR{item.role | latex_escape}}\BLOCK{endif}}
+  {\VAR{item.start_date.strftime("%b %Y") if item.start_date else ""}\BLOCK{if item.end_date} -- \VAR{item.end_date.strftime("%b %Y")}\BLOCK{endif}}
+\BLOCK{if item.description}\VAR{item.description | format_description}\BLOCK{endif}
+\BLOCK{if item.skills}\small\textit{\VAR{item.skills | map(attribute="name") | map("latex_escape") | join(", ")}}\normalsize\\
+\BLOCK{endif}
+\BLOCK{if item.repository_url or item.demo_url}
+\small \BLOCK{if item.repository_url}\href{\VAR{item.repository_url | latex_safe_url}}{\VAR{item.repository_url | latex_escape}}\BLOCK{endif}\BLOCK{if item.repository_url and item.demo_url} \textperiodcentered\ \BLOCK{endif}\BLOCK{if item.demo_url}\href{\VAR{item.demo_url | latex_safe_url}}{\VAR{item.demo_url | latex_escape}}\BLOCK{endif}\normalsize\\
+\BLOCK{endif}
+\BLOCK{endfor}
+
+\BLOCK{elif section.type == "skills"}
+\section*{\VAR{section.title | latex_escape}}
+\VAR{section.entries | map(attribute="name") | map("latex_escape") | join(" $\\bullet$ ")}
+
+\BLOCK{elif section.type == "certifications"}
+\section*{\VAR{section.title | latex_escape}}
+\BLOCK{for item in section.entries}
+\resumeEntryHeading
+  {\VAR{item.name | latex_escape} \textperiodcentered\ \textit{\small \VAR{item.issuing_organization | latex_escape}}}
+  {\VAR{item.issue_date.strftime("%b %Y") if item.issue_date else ""}}
+\BLOCK{endfor}
+
+\BLOCK{elif section.type == "achievements"}
+\section*{\VAR{section.title | latex_escape}}
+\BLOCK{for item in section.entries}
+\resumeEntryHeading
+  {\VAR{item.title | latex_escape}\BLOCK{if item.issuer} \textperiodcentered\ \textit{\small \VAR{item.issuer | latex_escape}}\BLOCK{endif}}
+  {\VAR{item.date_achieved.strftime("%b %Y") if item.date_achieved else ""}}
+\BLOCK{if item.description}\VAR{item.description | format_description}\BLOCK{endif}
+\BLOCK{endfor}
+
+\BLOCK{elif section.type == "awards"}
+\section*{\VAR{section.title | latex_escape}}
+\BLOCK{for item in section.entries}
+\resumeEntryHeading
+  {\VAR{item.title | latex_escape}\BLOCK{if item.issuer} \textperiodcentered\ \textit{\small \VAR{item.issuer | latex_escape}}\BLOCK{endif}}
+  {\VAR{item.date_received.strftime("%b %Y") if item.date_received else ""}}
+\BLOCK{if item.description}\VAR{item.description | format_description}\BLOCK{endif}
+\BLOCK{endfor}
+
+\BLOCK{elif section.type == "research"}
+\section*{\VAR{section.title | latex_escape}}
+\BLOCK{for item in section.entries}
+\resumeEntryHeading
+  {\VAR{item.title | latex_escape}\BLOCK{if item.publication_venue} \textperiodcentered\ \textit{\small \VAR{item.publication_venue | latex_escape}}\BLOCK{endif}}
+  {\VAR{item.publication_date.strftime("%b %Y") if item.publication_date else ""}}
+\BLOCK{if item.description}\VAR{item.description | format_description}\BLOCK{endif}
+\BLOCK{if item.url}\small\href{\VAR{item.url | latex_safe_url}}{\VAR{item.url | latex_escape}}\normalsize\\
+\BLOCK{endif}
+\BLOCK{endfor}
+
+\BLOCK{elif section.type == "volunteer_experience"}
+\section*{\VAR{section.title | latex_escape}}
+\BLOCK{for item in section.entries}
+\resumeSubheading
+  {\VAR{item.role | latex_escape} \textperiodcentered\ \VAR{item.organization_name | latex_escape}}
+  {\VAR{item.start_date.strftime("%b %Y") if item.start_date else ""} -- \VAR{"Present" if item.is_current else (item.end_date.strftime("%b %Y") if item.end_date else "")}}
+  { }
+  { }
+\BLOCK{if item.description}\VAR{item.description | format_description}\BLOCK{endif}
+\BLOCK{endfor}
+
+\BLOCK{elif section.type == "leadership_roles"}
+\section*{\VAR{section.title | latex_escape}}
+\BLOCK{for item in section.entries}
+\resumeSubheading
+  {\VAR{item.title | latex_escape} \textperiodcentered\ \VAR{item.organization_name | latex_escape}}
+  {\VAR{item.start_date.strftime("%b %Y") if item.start_date else ""} -- \VAR{"Present" if item.is_current else (item.end_date.strftime("%b %Y") if item.end_date else "")}}
+  { }
+  { }
+\BLOCK{if item.description}\VAR{item.description | format_description}\BLOCK{endif}
+\BLOCK{endfor}
+
+\BLOCK{elif section.type == "organizations"}
+\section*{\VAR{section.title | latex_escape}}
+\BLOCK{for item in section.entries}
+\resumeSubheading
+  {\VAR{item.organization_name | latex_escape}}
+  {\BLOCK{if item.start_date or item.end_date or item.is_current}\VAR{item.start_date.strftime("%b %Y") if item.start_date else ""} -- \VAR{"Present" if item.is_current else (item.end_date.strftime("%b %Y") if item.end_date else "")}\BLOCK{endif}}
+  {\VAR{item.role | latex_escape if item.role else ""}}
+  { }
+\BLOCK{if item.description}\VAR{item.description | format_description}\BLOCK{endif}
+\BLOCK{endfor}
+
+\BLOCK{elif section.type == "languages"}
+\section*{\VAR{section.title | latex_escape}}
+\VAR{section.entries | map(attribute="name") | map("latex_escape") | join(" $\\bullet$ ")}
+
+\BLOCK{elif section.type == "references"}
+\section*{\VAR{section.title | latex_escape}}
+\BLOCK{for item in section.entries}
+\resumeEntryHeading
+  {\VAR{item.name | latex_escape}\BLOCK{if item.relationship} \textperiodcentered\ \textit{\small \VAR{item.relationship | latex_escape}}\BLOCK{endif}}
+  { }
+\BLOCK{if item.contact_email or item.contact_phone}
+\small \BLOCK{if item.contact_email}\VAR{item.contact_email | latex_escape}\BLOCK{endif}\BLOCK{if item.contact_email and item.contact_phone} \textperiodcentered\ \BLOCK{endif}\BLOCK{if item.contact_phone}\VAR{item.contact_phone | latex_escape}\BLOCK{endif}\normalsize\\
+\BLOCK{endif}
+\BLOCK{if item.description}\VAR{item.description | format_description}\BLOCK{endif}
+\BLOCK{endfor}
+
+\BLOCK{elif section.type == "hackathons"}
+\section*{\VAR{section.title | latex_escape}}
+\BLOCK{for item in section.entries}
+\resumeEntryHeading
+  {\VAR{item.name | latex_escape}\BLOCK{if item.project_name} \textperiodcentered\ \textit{\small \VAR{item.project_name | latex_escape}}\BLOCK{endif}}
+  {\VAR{item.event_date.strftime("%b %Y") if item.event_date else ""}}
+\BLOCK{if item.result}\textit{\small \VAR{item.result | latex_escape}}\\
+\BLOCK{endif}
+\BLOCK{if item.description}\VAR{item.description | format_description}\BLOCK{endif}
+\BLOCK{endfor}
+
+\BLOCK{elif section.type == "competitions"}
+\section*{\VAR{section.title | latex_escape}}
+\BLOCK{for item in section.entries}
+\resumeEntryHeading
+  {\VAR{item.name | latex_escape}}
+  {\VAR{item.event_date.strftime("%b %Y") if item.event_date else ""}}
+\BLOCK{if item.result}\textit{\small \VAR{item.result | latex_escape}}\\
+\BLOCK{endif}
+\BLOCK{if item.description}\VAR{item.description | format_description}\BLOCK{endif}
+\BLOCK{endfor}
+
+\BLOCK{elif section.type == "patents"}
+\section*{\VAR{section.title | latex_escape}}
+\BLOCK{for item in section.entries}
+\resumeEntryHeading
+  {\VAR{item.title | latex_escape}\BLOCK{if item.patent_number} (\VAR{item.patent_number | latex_escape})\BLOCK{endif}}
+  {\VAR{item.filing_date.strftime("%b %Y") if item.filing_date else ""}}
+\textit{\small \VAR{item.status.value.replace("_", " ").title() | latex_escape}}\\
+\BLOCK{if item.description}\VAR{item.description | format_description}\BLOCK{endif}
+\BLOCK{if item.url}\small\href{\VAR{item.url | latex_safe_url}}{\VAR{item.url | latex_escape}}\normalsize\\
+\BLOCK{endif}
+\BLOCK{endfor}
+\BLOCK{endif}
+\BLOCK{endfor}
+
+\end{document}

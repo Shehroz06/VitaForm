@@ -71,6 +71,12 @@ async def _seed_default_resume_templates(conn: AsyncConnection) -> None:
                 "name": name,
                 "description": description,
                 "is_active": True,
+                # Mirrors the real 51d20bd33ee5 migration's data update --
+                # this test DB is built via create_all, not alembic, so
+                # nothing else sets render_engine to 'latex' for ats_safe.
+                # Without this, tests would silently exercise ats_safe's
+                # unused HTML template instead of the real LaTeX path.
+                "render_engine": "latex" if slug == "ats_safe" else "html",
                 "created_at": now,
                 "updated_at": now,
             }

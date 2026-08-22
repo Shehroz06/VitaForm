@@ -93,3 +93,13 @@ class ImportSessionStatus(StrEnum):
     CONFIRMED = "confirmed"
     REJECTED = "rejected"
     FAILED = "failed"
+
+
+class RenderEngine(StrEnum):
+    """Which pipeline a resume template compiles through. HTML -> Jinja2 ->
+    WeasyPrint (every template so far); LATEX -> Jinja2 -> pdflatex, for
+    templates that need to be an actual LaTeX document rather than an
+    HTML approximation of one."""
+
+    HTML = "html"
+    LATEX = "latex"

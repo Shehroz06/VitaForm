@@ -4,6 +4,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential libpq-dev curl fonts-liberation \
     fonts-crosextra-carlito fonts-crosextra-caladea \
     libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 libcairo2 shared-mime-info \
+    texlive-latex-base texlive-latex-recommended texlive-latex-extra \
+    texlive-fonts-recommended lmodern \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
