@@ -17,7 +17,7 @@ ADDITIONAL_TEMPLATES = [
 ATS_SAFE_TEMPLATES = [
     (
         "ats_safe",
-        "ATS Safe",
+        "LaTeX",
         "The most conservative layout, built purely for maximum parser compatibility.",
     ),
 ]

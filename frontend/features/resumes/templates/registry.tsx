@@ -42,7 +42,7 @@ export const TEMPLATE_REGISTRY: Record<TemplateSlug, TemplateDefinition> = {
   },
   ats_safe: {
     slug: "ats_safe",
-    name: "ATS Safe",
+    name: "LaTeX",
     description: "The most conservative layout, built purely for maximum parser compatibility.",
     // Deliberately not #1a1a1a -- that's Classic's (and Compact's) default,
     // and both are already single-column/minimal, so an identical accent
