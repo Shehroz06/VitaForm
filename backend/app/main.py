@@ -19,6 +19,13 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        # Browsers hide every response header from JS except the CORS
+        # safelist (Content-Type, Content-Length, etc.) unless the server
+        # explicitly opts a custom header in -- without this, the resume
+        # preview's X-Page-Count header (features/resumes/router.py) is
+        # readable via curl but silently comes back null in the actual
+        # frontend, since it's cross-origin (localhost:3000 -> :8000).
+        expose_headers=["X-Page-Count"],
     )
 
     register_exception_handlers(app)

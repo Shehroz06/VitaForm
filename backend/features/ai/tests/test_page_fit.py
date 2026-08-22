@@ -12,8 +12,12 @@ from types import SimpleNamespace
 import pytest
 
 import features.ai.page_fit as page_fit
-from app.core.enums import SectionType
-from features.ai.page_fit import fit_resume_to_one_page
+from app.core.enums import RenderEngine, SectionType
+from features.ai.page_fit import (
+    fit_resume_to_one_page,
+    fit_spacing_and_density,
+    position_based_scores,
+)
 from features.resumes.schemas import ResumeContent, ResumeSection
 
 _ITEMS_PER_PAGE = 3
@@ -48,7 +52,9 @@ def _section(section_type: SectionType, count: int) -> ResumeSection:
 async def _fit(content: ResumeContent, scores: dict[uuid.UUID, float]) -> ResumeContent:
     return await fit_resume_to_one_page(
         renderer=_FakeRenderer(),  # type: ignore[arg-type]
-        template=SimpleNamespace(id=uuid.uuid4(), slug="classic"),  # type: ignore[arg-type]
+        template=SimpleNamespace(
+            id=uuid.uuid4(), slug="classic", render_engine=RenderEngine.HTML
+        ),  # type: ignore[arg-type]
         profile=SimpleNamespace(id=uuid.uuid4()),  # type: ignore[arg-type]
         email="user@example.com",
         full_name="Ada Lovelace",
@@ -59,13 +65,23 @@ async def _fit(content: ResumeContent, scores: dict[uuid.UUID, float]) -> Resume
 
 
 async def test_fit_leaves_content_unchanged_when_already_one_page() -> None:
+    """Content that already fits settles at "relaxed" (the loosest,
+    best-looking preset) rather than staying at whatever spacing the
+    content happened to arrive with -- fit_spacing_and_density always
+    searches from relaxed outward, not forward from the current setting,
+    which is what makes it reversible: content that gets shorter (items
+    removed) finds its way back to a looser spacing on the next call
+    instead of staying stuck at a denser one a previous call left behind."""
     education = _section(SectionType.EDUCATION, 1)
     projects = _section(SectionType.PROJECTS, 2)
     content = ResumeContent(sections=[education, projects])
 
     result = await _fit(content, scores={})
 
-    assert result == content
+    assert result.sections == content.sections
+    assert result.summary == content.summary
+    assert result.style.spacing == "relaxed"
+    assert result.style.content_density == 1.0
 
 
 async def test_fit_trims_lowest_scored_items_first() -> None:
@@ -143,7 +159,9 @@ async def test_fit_tightens_spacing_before_removing_any_item(
 
     result = await fit_resume_to_one_page(
         renderer=_SpacingAwareFakeRenderer(),  # type: ignore[arg-type]
-        template=SimpleNamespace(id=uuid.uuid4(), slug="classic"),  # type: ignore[arg-type]
+        template=SimpleNamespace(
+            id=uuid.uuid4(), slug="classic", render_engine=RenderEngine.HTML
+        ),  # type: ignore[arg-type]
         profile=SimpleNamespace(id=uuid.uuid4()),  # type: ignore[arg-type]
         email="user@example.com",
         full_name="Ada Lovelace",
@@ -155,6 +173,58 @@ async def test_fit_tightens_spacing_before_removing_any_item(
     # Nothing removed -- tightening spacing alone was enough to fit.
     assert len(result.sections[0].item_ids) == 6
     assert result.style.spacing == "compact"
+
+
+async def test_fit_spacing_and_density_loosens_back_up_after_content_shrinks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression test for a real bug found in manual testing: auto-fit only
+    ever tightened spacing, never loosened it back up once content that had
+    forced "compact" was later removed -- because the old search started
+    from the content's *current* spacing and only ever moved denser. It
+    must be reversible: the same profile at 6 items settles at "compact",
+    and at 2 items (after the user deletes some) settles back at "relaxed",
+    not wherever a previous call happened to leave it."""
+
+    def _fake_count(pdf_bytes: bytes) -> int:
+        total_items_str, spacing = pdf_bytes.decode().split(":")
+        total_items = int(total_items_str)
+        capacity = _SpacingAwareFakeRenderer._CAPACITY[spacing]
+        return max(1, -(-total_items // capacity))
+
+    monkeypatch.setattr(page_fit, "count_pdf_pages", _fake_count)
+
+    template = SimpleNamespace(
+        id=uuid.uuid4(), slug="classic", render_engine=RenderEngine.HTML
+    )
+    profile = SimpleNamespace(id=uuid.uuid4())
+    kwargs = dict(
+        renderer=_SpacingAwareFakeRenderer(),
+        template=template,
+        profile=profile,
+        email="user@example.com",
+        full_name="Ada Lovelace",
+        title="AI Resume",
+    )
+
+    dense_content = ResumeContent(sections=[_section(SectionType.PROJECTS, 6)])
+    dense_result, dense_overflowing = await fit_spacing_and_density(
+        content=dense_content, **kwargs  # type: ignore[arg-type]
+    )
+    assert not dense_overflowing
+    assert dense_result.style.spacing == "compact"
+
+    # Same call, but starting from that "compact" result content with most
+    # items removed -- simulates the user deleting projects after a
+    # previous auto-fit already tightened things.
+    sparse_content = dense_result.model_copy(
+        update={"sections": [_section(SectionType.PROJECTS, 2)]}
+    )
+    sparse_result, sparse_overflowing = await fit_spacing_and_density(
+        content=sparse_content, **kwargs  # type: ignore[arg-type]
+    )
+    assert not sparse_overflowing
+    assert sparse_result.style.spacing == "relaxed"
 
 
 class _DensityAwareFakeRenderer:
@@ -181,7 +251,9 @@ async def test_fit_scales_density_before_removing_any_item(
 
     result = await fit_resume_to_one_page(
         renderer=_DensityAwareFakeRenderer(),  # type: ignore[arg-type]
-        template=SimpleNamespace(id=uuid.uuid4(), slug="classic"),  # type: ignore[arg-type]
+        template=SimpleNamespace(
+            id=uuid.uuid4(), slug="classic", render_engine=RenderEngine.HTML
+        ),  # type: ignore[arg-type]
         profile=SimpleNamespace(id=uuid.uuid4()),  # type: ignore[arg-type]
         email="user@example.com",
         full_name="Ada Lovelace",
@@ -190,9 +262,12 @@ async def test_fit_scales_density_before_removing_any_item(
         scores_by_item_id={},
     )
 
-    # Nothing removed -- density scaling alone was enough to fit.
+    # Nothing removed -- density scaling alone was enough to fit. The fake
+    # renderer ignores spacing entirely, so none of the discrete presets
+    # ever resolve it -- the density search continues from the tightest
+    # one tried (_SPACING_LEVELS[-1], "extreme"), not a hardcoded "compact".
     assert len(result.sections[0].item_ids) == 7
-    assert result.style.spacing == "compact"
+    assert result.style.spacing == "extreme"
     # Bisection should land close to the true fit boundary (0.9), never
     # below it (that would over-shrink) and never above (wouldn't fit).
     assert 0.8 <= result.style.content_density <= 0.9
@@ -218,3 +293,21 @@ async def test_fit_marks_emptied_sections_not_visible() -> None:
     by_type = {s.section_type: s for s in result.sections}
     assert by_type[SectionType.PROJECTS].item_ids == []
     assert by_type[SectionType.PROJECTS].visible is False
+
+
+def test_position_based_scores_ranks_earlier_items_higher() -> None:
+    first_id, second_id, third_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    experience = ResumeSection(
+        section_type=SectionType.EXPERIENCE, item_ids=[first_id, second_id], visible=True
+    )
+    projects = ResumeSection(section_type=SectionType.PROJECTS, item_ids=[third_id], visible=True)
+    content = ResumeContent(sections=[experience, projects])
+
+    scores = position_based_scores(content)
+
+    assert scores[first_id] > scores[second_id] > scores[third_id]
+
+
+def test_position_based_scores_ignores_the_summary_section() -> None:
+    content = ResumeContent(sections=[ResumeSection(section_type=SectionType.SUMMARY)])
+    assert position_based_scores(content) == {}

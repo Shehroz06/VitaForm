@@ -27,3 +27,23 @@ async def load_candidate_items(
         items = (await db.execute(stmt)).scalars().all()
         result[section_type] = list(items)
     return result
+
+
+def flatten_descriptions_by_item_id(
+    items_by_type: dict[SectionType, list[Any]],
+) -> dict[uuid.UUID, str]:
+    """Item objects loaded for ranking already carry their own description
+    text -- this just makes it addressable by id, for page_fit.py's
+    condensing step (both AI generation's and the manual builder's
+    "extreme fit") and ai/service.py's _jd_tailored_overrides to look up
+    without either one needing its own DB access. getattr with a default:
+    not every section type has a description field (Skill, Certification),
+    and that's fine -- there's simply nothing to condense or tailor for
+    those."""
+    descriptions: dict[uuid.UUID, str] = {}
+    for items in items_by_type.values():
+        for item in items:
+            description = getattr(item, "description", None)
+            if description:
+                descriptions[item.id] = description
+    return descriptions

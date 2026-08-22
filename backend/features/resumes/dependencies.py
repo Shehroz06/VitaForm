@@ -48,6 +48,7 @@ def get_resume_renderer(db: Annotated[AsyncSession, Depends(get_db)]) -> ResumeR
 
 
 def get_resume_export_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
     renderer: Annotated[ResumeRenderer, Depends(get_resume_renderer)],
     version_repository: Annotated[ResumeVersionRepository, Depends(get_resume_version_repository)],
     template_repository: Annotated[
@@ -55,4 +56,6 @@ def get_resume_export_service(
     ],
     file_service: Annotated[FileUploadService, Depends(get_file_upload_service)],
 ) -> ResumeExportService:
-    return ResumeExportService(renderer, version_repository, template_repository, file_service)
+    return ResumeExportService(
+        db, renderer, version_repository, template_repository, file_service
+    )

@@ -63,7 +63,7 @@ def get_generation_service(
 ) -> GenerationService:
     renderer = ResumeRenderer(db)
     export_service = ResumeExportService(
-        renderer, version_repository, template_repository, file_service
+        db, renderer, version_repository, template_repository, file_service
     )
     return GenerationService(
         db,

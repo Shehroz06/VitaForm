@@ -162,7 +162,12 @@ async def test_generate_resume_retries_and_succeeds_after_invalid_json(
     )
 
     assert response.status_code == 200
-    assert fake.call_count == 2
+    # >= 2, not ==: proves the invalid-JSON response was retried and the
+    # generation call succeeded on the 2nd attempt, without coupling this
+    # test to the exact call count of the separate, best-effort description
+    # rewrite step (service.py's rewrite_descriptions) that also shares
+    # this fake provider and adds its own call(s) afterward.
+    assert fake.call_count >= 2
 
 
 async def test_generate_resume_falls_back_to_second_provider(
@@ -220,7 +225,7 @@ async def test_generate_resume_returns_friendly_error_when_all_providers_fail(
         json={"template_id": template_id, "job_description": _LONG_JOB_DESCRIPTION},
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 503
     assert response.json()["success"] is False
 
 
@@ -283,13 +288,17 @@ async def test_successful_generation_records_provider_logs(
     assert logs[-1].provider == "gemini"
 
 
-_LONG_ROLE_DESCRIPTION = (
+_ROLE_DESCRIPTION_PARAGRAPH = (
     "Led backend engineering for a high-traffic Python and AWS platform, designing "
     "scalable REST APIs, distributed queues, and observability tooling used by dozens "
     "of downstream teams. Owned the service's reliability roadmap end to end, from "
     "incident response through capacity planning, and mentored a growing group of "
     "backend engineers on API design, testing, and deployment practices. "
-) * 3
+)
+_LONG_ROLE_DESCRIPTION = _ROLE_DESCRIPTION_PARAGRAPH * 3
+# Near the Experience.description field's 2000-char max -- condensing every
+# item to ~50% still leaves far more than one page can hold.
+_SEVERELY_LONG_ROLE_DESCRIPTION = _ROLE_DESCRIPTION_PARAGRAPH * 5
 
 
 async def _seed_page_overflowing_profile(client: AsyncClient, headers: dict[str, str]) -> None:
@@ -346,11 +355,81 @@ async def test_generate_resume_trims_content_to_fit_one_page(
 
     resume_id = body["resume_id"]
     version_response = await client.get(f"/api/v1/resumes/{resume_id}/content", headers=headers)
+    resume_content = version_response.json()["data"]["content"]
+    experience_section = next(
+        s for s in resume_content["sections"] if s["section_type"] == "experience"
+    )
+    # The AI was offered all 6 (the FakeAIProvider selects everything it's
+    # given). The fit pipeline now condenses descriptions (page_fit.py's
+    # _condense_lowest_relevance_descriptions) before it ever deletes an
+    # item outright, so all 6 survive here -- proof of trimming work is the
+    # presence of shortened, extractive-only description_overrides rather
+    # than a smaller item count.
+    assert len(experience_section["item_ids"]) == 6
+    assert resume_content["description_overrides"], "expected at least one condensed description"
+    for item_id, override_text in resume_content["description_overrides"].items():
+        assert item_id in experience_section["item_ids"]
+        # Extractive only: every word in the override must already exist in
+        # the original text -- nothing invented.
+        assert set(override_text.replace("•", "").split()) <= set(
+            _LONG_ROLE_DESCRIPTION.split()
+        )
+
+
+async def test_generate_resume_still_deletes_items_when_condensing_is_not_enough(
+    client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch
+) -> None:
+    """Condensing (see the test above) is tried first, but it's not a
+    substitute for deletion -- content severe enough to still overflow
+    after every description is condensed must still fall through to
+    page_fit.py's item-removal loop, same as before condensing existed."""
+    headers = await _auth(client, captured_emails, "aiGen8@example.com")
+    await client.post(
+        "/api/v1/education",
+        headers=headers,
+        json={
+            "institution_name": "MIT",
+            "degree": "BSc Computer Science",
+            "start_date": "2014-09-01",
+            "end_date": "2018-06-01",
+            "is_current": False,
+        },
+    )
+    for i in range(6):
+        await client.post(
+            "/api/v1/experience",
+            headers=headers,
+            json={
+                "company_name": f"Company {i}",
+                "job_title": "Senior Backend Engineer",
+                "employment_type": "full_time",
+                "start_date": f"{2018 + i}-01-01",
+                "end_date": f"{2018 + i}-12-01",
+                "is_current": False,
+                "description": _SEVERELY_LONG_ROLE_DESCRIPTION,
+            },
+        )
+    template_id = await _classic_template_id(client)
+    _patch_providers(monkeypatch, {"gemini": FakeAIProvider("gemini")})
+
+    response = await client.post(
+        "/api/v1/resumes/generate",
+        headers=headers,
+        json={"template_id": template_id, "job_description": _LONG_JOB_DESCRIPTION},
+    )
+
+    assert response.status_code == 200
+    body = response.json()["data"]
+
+    pdf_response = await client.get(body["file"]["url"])
+    with pymupdf.open(stream=pdf_response.content, filetype="pdf") as doc:
+        assert doc.page_count == 1
+
+    resume_id = body["resume_id"]
+    version_response = await client.get(f"/api/v1/resumes/{resume_id}/content", headers=headers)
     experience_section = next(
         s
         for s in version_response.json()["data"]["content"]["sections"]
         if s["section_type"] == "experience"
     )
-    # The AI was offered all 6 (the FakeAIProvider selects everything it's
-    # given), but the trim loop must have dropped some to reach one page.
     assert 0 < len(experience_section["item_ids"]) < 6

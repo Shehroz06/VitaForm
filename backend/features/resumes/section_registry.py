@@ -41,6 +41,44 @@ SECTION_MODELS: dict[SectionType, type[CrudModelMixin]] = {
     SectionType.PATENTS: Patent,
 }
 
+# The model attribute holding an item's "sub-heading" (its own title/role,
+# as opposed to the section's title) -- used by renderer.py to know which
+# attribute name a per-resume title_override actually replaces. Skills,
+# Languages, and References render as simple inline lists with no
+# sub-heading concept, so they're intentionally absent here.
+TITLE_FIELDS: dict[SectionType, str] = {
+    SectionType.EDUCATION: "degree",
+    SectionType.EXPERIENCE: "job_title",
+    SectionType.PROJECTS: "title",
+    SectionType.CERTIFICATIONS: "name",
+    SectionType.ACHIEVEMENTS: "title",
+    SectionType.AWARDS: "title",
+    SectionType.RESEARCH: "title",
+    SectionType.VOLUNTEER_EXPERIENCE: "role",
+    SectionType.LEADERSHIP_ROLES: "title",
+    SectionType.ORGANIZATIONS: "role",
+    SectionType.HACKATHONS: "name",
+    SectionType.COMPETITIONS: "name",
+    SectionType.PATENTS: "title",
+}
+
+# The model attribute holding an item's organization/institution line --
+# the second half of a sub-heading (e.g. Experience's "job_title" +
+# "company_name"). Absent for section types with no separate org concept
+# (Projects, Patents, Competitions, Hackathons) -- those items have only a
+# title, so `subtitle_override` is simply not offered for them.
+SUBTITLE_FIELDS: dict[SectionType, str] = {
+    SectionType.EDUCATION: "institution_name",
+    SectionType.EXPERIENCE: "company_name",
+    SectionType.CERTIFICATIONS: "issuing_organization",
+    SectionType.ACHIEVEMENTS: "issuer",
+    SectionType.AWARDS: "issuer",
+    SectionType.RESEARCH: "publication_venue",
+    SectionType.VOLUNTEER_EXPERIENCE: "organization_name",
+    SectionType.LEADERSHIP_ROLES: "organization_name",
+    SectionType.ORGANIZATIONS: "organization_name",
+}
+
 DEFAULT_SECTION_TITLES: dict[SectionType, str] = {
     SectionType.SUMMARY: "Summary",
     SectionType.EDUCATION: "Education",

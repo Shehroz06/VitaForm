@@ -1,7 +1,15 @@
+import shutil
+
 import pymupdf
+import pytest
 from httpx import AsyncClient
 
 from tests.support import auth_headers, create_verified_user_and_login
+
+# ats_safe compiles through real pdflatex (see latex_renderer.py), which
+# isn't installed on every machine this suite runs on -- it always is in
+# the Docker image (docker/backend.Dockerfile) where full coverage runs.
+_HAS_PDFLATEX = shutil.which("pdflatex") is not None
 
 
 async def _auth(
@@ -213,6 +221,61 @@ async def test_content_update_rejects_item_ids_not_owned_by_caller(
     assert response.status_code == 422
 
 
+async def test_title_and_subtitle_overrides_render_without_touching_the_profile_record(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "titleOverride@example.com")
+    template_id = await _classic_template_id(client)
+
+    experience_response = await client.post(
+        "/api/v1/experience",
+        headers=headers,
+        json={
+            "company_name": "Acme Corp",
+            "job_title": "Software Engineering Intern",
+            "employment_type": "internship",
+            "start_date": "2024-01-01",
+            "is_current": True,
+        },
+    )
+    experience_id = experience_response.json()["data"]["id"]
+
+    create_response = await client.post(
+        "/api/v1/resumes", headers=headers, json={"title": "Resume", "template_id": template_id}
+    )
+    resume_id = create_response.json()["data"]["id"]
+
+    await client.patch(
+        f"/api/v1/resumes/{resume_id}/content",
+        headers=headers,
+        json={
+            "summary": None,
+            "contact_visibility": {},
+            "sections": [
+                {"section_type": "experience", "visible": True, "item_ids": [experience_id]}
+            ],
+            "title_overrides": {experience_id: "Backend Engineering Intern"},
+            "subtitle_overrides": {experience_id: "Acme Corp (Tailored)"},
+        },
+    )
+
+    export_response = await client.post(f"/api/v1/resumes/{resume_id}/export", headers=headers)
+    assert export_response.status_code == 200
+    pdf_response = await client.get(export_response.json()["data"]["url"])
+    with pymupdf.open(stream=pdf_response.content, filetype="pdf") as doc:
+        text = doc[0].get_text()
+
+    assert "Backend Engineering Intern" in text
+    assert "Acme Corp (Tailored)" in text
+    assert "Software Engineering Intern" not in text
+
+    # The override must be resume-scoped only -- the real profile record is
+    # untouched, exactly like description_overrides already guarantees.
+    experience_get = await client.get(f"/api/v1/experience/{experience_id}", headers=headers)
+    assert experience_get.json()["data"]["job_title"] == "Software Engineering Intern"
+    assert experience_get.json()["data"]["company_name"] == "Acme Corp"
+
+
 async def test_users_cannot_access_each_others_resumes(
     client: AsyncClient, captured_emails: list[dict[str, str]]
 ) -> None:
@@ -279,6 +342,397 @@ async def test_export_resume_produces_downloadable_pdf(
     assert pdf_response.status_code == 200
     assert pdf_response.headers["content-type"] == "application/pdf"
     assert pdf_response.content[:4] == b"%PDF"
+
+
+async def _resume_with_education(
+    client: AsyncClient, headers: dict[str, str], template_id: str
+) -> str:
+    education_response = await client.post(
+        "/api/v1/education",
+        headers=headers,
+        json={
+            "institution_name": "MIT",
+            "degree": "BSc",
+            "field_of_study": "Computer Science",
+            "start_date": "2018-01-01",
+            "end_date": "2022-01-01",
+            "is_current": False,
+        },
+    )
+    education_id = education_response.json()["data"]["id"]
+
+    create_response = await client.post(
+        "/api/v1/resumes",
+        headers=headers,
+        json={"title": "My Resume", "template_id": template_id},
+    )
+    resume_id: str = create_response.json()["data"]["id"]
+
+    await client.put(
+        f"/api/v1/resumes/{resume_id}/content",
+        headers=headers,
+        json={
+            "summary": "Experienced software engineer.",
+            "contact_visibility": {},
+            "sections": [
+                {"section_type": "summary", "visible": True, "item_ids": []},
+                {"section_type": "education", "visible": True, "item_ids": [education_id]},
+            ],
+        },
+    )
+    return resume_id
+
+
+async def test_preview_resume_returns_png_of_real_render(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    """The live builder preview shows this image directly instead of a
+    second, hand-maintained React re-implementation of the template -- this
+    is what guarantees the preview can never drift from the real export."""
+    headers = await _auth(client, captured_emails, "resumePreview1@example.com")
+    template_id = await _classic_template_id(client)
+    resume_id = await _resume_with_education(client, headers, template_id)
+
+    preview_response = await client.get(f"/api/v1/resumes/{resume_id}/preview", headers=headers)
+
+    assert preview_response.status_code == 200
+    assert preview_response.headers["content-type"] == "image/png"
+    assert preview_response.headers["cache-control"] == "no-store"
+    assert preview_response.headers["x-page-count"] == "1"
+    assert preview_response.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+async def test_preview_resume_page_query_param_returns_later_pages(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    """A resume built manually (no auto-fit applied) can genuinely overflow
+    to multiple pages -- the builder's preview needs to be able to show
+    page 2+, not just silently crop to page 1."""
+    headers = await _auth(client, captured_emails, "resumePreviewMultiPage@example.com")
+    template_id = await _classic_template_id(client)
+
+    education_ids = []
+    for i in range(10):
+        education_response = await client.post(
+            "/api/v1/education",
+            headers=headers,
+            json={
+                "institution_name": f"University {i}",
+                "degree": "BSc",
+                "field_of_study": "Computer Science",
+                "description": "Relevant coursework and extensive extracurricular activities. " * 6,
+                "start_date": "2018-01-01",
+                "end_date": "2022-01-01",
+                "is_current": False,
+            },
+        )
+        education_ids.append(education_response.json()["data"]["id"])
+
+    create_response = await client.post(
+        "/api/v1/resumes",
+        headers=headers,
+        json={"title": "Overflowing Resume", "template_id": template_id},
+    )
+    resume_id = create_response.json()["data"]["id"]
+    await client.put(
+        f"/api/v1/resumes/{resume_id}/content",
+        headers=headers,
+        json={
+            "summary": "Experienced software engineer.",
+            "contact_visibility": {},
+            "sections": [
+                {"section_type": "summary", "visible": True, "item_ids": []},
+                {"section_type": "education", "visible": True, "item_ids": education_ids},
+            ],
+            "style": {"spacing": "relaxed"},
+        },
+    )
+
+    page1_response = await client.get(f"/api/v1/resumes/{resume_id}/preview", headers=headers)
+    assert page1_response.status_code == 200
+    page_count = int(page1_response.headers["x-page-count"])
+    assert page_count > 1, "expected this deliberately overloaded resume to overflow one page"
+
+    page2_response = await client.get(
+        f"/api/v1/resumes/{resume_id}/preview", headers=headers, params={"page": 2}
+    )
+    assert page2_response.status_code == 200
+    assert page2_response.headers["x-page-count"] == str(page_count)
+    assert page2_response.content != page1_response.content
+
+    # Out-of-range page numbers clamp to the last real page rather than 404ing.
+    last_page_response = await client.get(
+        f"/api/v1/resumes/{resume_id}/preview", headers=headers, params={"page": page_count}
+    )
+    overshoot_response = await client.get(
+        f"/api/v1/resumes/{resume_id}/preview", headers=headers, params={"page": 999}
+    )
+    assert overshoot_response.status_code == 200
+    assert overshoot_response.content == last_page_response.content
+
+
+@pytest.mark.skipif(not _HAS_PDFLATEX, reason="pdflatex not installed on this machine")
+async def test_preview_resume_works_for_latex_engine_template(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "resumePreview2@example.com")
+    templates_response = await client.get("/api/v1/resume-templates")
+    ats_safe_id = next(
+        t["id"] for t in templates_response.json()["data"] if t["slug"] == "ats_safe"
+    )
+    resume_id = await _resume_with_education(client, headers, ats_safe_id)
+
+    preview_response = await client.get(f"/api/v1/resumes/{resume_id}/preview", headers=headers)
+
+    assert preview_response.status_code == 200
+    assert preview_response.headers["content-type"] == "image/png"
+    assert preview_response.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+@pytest.mark.skipif(not _HAS_PDFLATEX, reason="pdflatex not installed on this machine")
+async def test_export_tex_returns_the_raw_latex_source(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "resumeExportTex1@example.com")
+    templates_response = await client.get("/api/v1/resume-templates")
+    ats_safe_id = next(
+        t["id"] for t in templates_response.json()["data"] if t["slug"] == "ats_safe"
+    )
+    resume_id = await _resume_with_education(client, headers, ats_safe_id)
+
+    response = await client.get(f"/api/v1/resumes/{resume_id}/export-tex", headers=headers)
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/x-tex")
+    assert "attachment" in response.headers["content-disposition"]
+    assert response.text.startswith("\\documentclass")
+    assert "MIT" in response.text
+
+
+async def test_export_tex_rejects_non_latex_templates(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "resumeExportTex2@example.com")
+    template_id = await _classic_template_id(client)
+    resume_id = await _resume_with_education(client, headers, template_id)
+
+    response = await client.get(f"/api/v1/resumes/{resume_id}/export-tex", headers=headers)
+
+    assert response.status_code == 422
+
+
+async def test_preview_with_renders_unsaved_content_against_a_candidate_template(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "resumePreviewWith1@example.com")
+    templates_response = await client.get("/api/v1/resume-templates")
+    templates = templates_response.json()["data"]
+    classic_id = next(t["id"] for t in templates if t["slug"] == "classic")
+    modern_id = next(t["id"] for t in templates if t["slug"] == "modern")
+
+    education_response = await client.post(
+        "/api/v1/education",
+        headers=headers,
+        json={
+            "institution_name": "MIT",
+            "degree": "BSc",
+            "start_date": "2018-01-01",
+            "is_current": False,
+        },
+    )
+    education_id = education_response.json()["data"]["id"]
+
+    resume_id = await _resume_with_education(client, headers, classic_id)
+
+    # Ask for a render against `modern`, a template this resume was never
+    # saved with -- nothing about the resume itself should change.
+    response = await client.post(
+        f"/api/v1/resumes/{resume_id}/preview-with",
+        headers=headers,
+        json={
+            "content": {
+                "summary": "Preview-only content.",
+                "contact_visibility": {},
+                "sections": [
+                    {"section_type": "summary", "visible": True, "item_ids": []},
+                    {"section_type": "education", "visible": True, "item_ids": [education_id]},
+                ],
+                "style": {},
+                "description_overrides": {},
+                "title_overrides": {},
+                "subtitle_overrides": {},
+            },
+            "template_id": modern_id,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    assert response.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+    unchanged_response = await client.get(f"/api/v1/resumes/{resume_id}", headers=headers)
+    assert unchanged_response.json()["data"]["template_id"] == classic_id
+
+
+async def test_preview_resume_requires_ownership(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers_a = await _auth(client, captured_emails, "resumePreviewIsoA@example.com")
+    headers_b = await _auth(client, captured_emails, "resumePreviewIsoB@example.com")
+    template_id = await _classic_template_id(client)
+    resume_id = await _resume_with_education(client, headers_a, template_id)
+
+    response = await client.get(f"/api/v1/resumes/{resume_id}/preview", headers=headers_b)
+    assert response.status_code == 404
+
+
+async def test_autofit_settles_on_relaxed_spacing_when_content_easily_fits(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    """Auto-fit always searches from "relaxed" outward (see page_fit.py's
+    fit_spacing_and_density), not forward from whatever spacing the resume
+    happened to already be at -- content this short settles at the loosest,
+    best-looking preset rather than staying at its previous setting."""
+    headers = await _auth(client, captured_emails, "resumeAutofit1@example.com")
+    template_id = await _classic_template_id(client)
+    resume_id = await _resume_with_education(client, headers, template_id)
+
+    response = await client.post(f"/api/v1/resumes/{resume_id}/autofit", headers=headers)
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["overflowing"] is False
+    assert data["version"]["content"]["style"]["spacing"] == "relaxed"
+
+
+async def test_autofit_tightens_spacing_for_content_that_overflows(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    """The manual builder's auto-fit action, run against a resume built by
+    hand (not AI generation) -- confirms the same lossless spacing/density
+    search AI generation uses is reachable from the manual content-editing
+    path, not just /resumes/generate."""
+    headers = await _auth(client, captured_emails, "resumeAutofit2@example.com")
+    template_id = await _classic_template_id(client)
+
+    education_ids = []
+    for i in range(12):
+        education_response = await client.post(
+            "/api/v1/education",
+            headers=headers,
+            json={
+                "institution_name": f"University {i}",
+                "degree": "BSc",
+                "field_of_study": "Computer Science",
+                "description": "Relevant coursework and extensive extracurricular activities. " * 5,
+                "start_date": "2018-01-01",
+                "end_date": "2022-01-01",
+                "is_current": False,
+            },
+        )
+        education_ids.append(education_response.json()["data"]["id"])
+
+    create_response = await client.post(
+        "/api/v1/resumes",
+        headers=headers,
+        json={"title": "Overflowing Resume", "template_id": template_id},
+    )
+    resume_id = create_response.json()["data"]["id"]
+
+    await client.put(
+        f"/api/v1/resumes/{resume_id}/content",
+        headers=headers,
+        json={
+            "summary": "Experienced software engineer.",
+            "contact_visibility": {},
+            "sections": [
+                {"section_type": "summary", "visible": True, "item_ids": []},
+                {"section_type": "education", "visible": True, "item_ids": education_ids},
+            ],
+            "style": {"spacing": "relaxed"},
+        },
+    )
+
+    response = await client.post(f"/api/v1/resumes/{resume_id}/autofit", headers=headers)
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    style = data["version"]["content"]["style"]
+    # Either it found a lossless fit (spacing tightened past "relaxed",
+    # possibly with content_density below 1.0) or it's honestly reporting
+    # that even the tightest lossless setting isn't enough -- either way,
+    # every education entry must still be present (autofit never deletes).
+    assert style["spacing"] != "relaxed" or style["content_density"] < 1.0
+    assert len(data["version"]["content"]["sections"][1]["item_ids"]) == 12
+
+
+async def test_autofit_aggressive_condenses_or_removes_items_plain_autofit_would_leave_alone(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    """`aggressive=true` is the manual builder's opt-in "extreme fit"
+    escalation -- unlike plain autofit (never touches content), this may
+    shorten descriptions or drop the lowest-priority items. Reuses the
+    same overflowing-by-design dataset as
+    test_autofit_tightens_spacing_for_content_that_overflows, where plain
+    autofit is forced to report overflowing=True with every item intact."""
+    headers = await _auth(client, captured_emails, "resumeAutofitAggressive1@example.com")
+    template_id = await _classic_template_id(client)
+
+    education_ids = []
+    for i in range(12):
+        education_response = await client.post(
+            "/api/v1/education",
+            headers=headers,
+            json={
+                "institution_name": f"University {i}",
+                "degree": "BSc",
+                "field_of_study": "Computer Science",
+                "description": "Relevant coursework and extensive extracurricular activities. " * 5,
+                "start_date": "2018-01-01",
+                "end_date": "2022-01-01",
+                "is_current": False,
+            },
+        )
+        education_ids.append(education_response.json()["data"]["id"])
+
+    create_response = await client.post(
+        "/api/v1/resumes",
+        headers=headers,
+        json={"title": "Overflowing Resume", "template_id": template_id},
+    )
+    resume_id = create_response.json()["data"]["id"]
+
+    await client.put(
+        f"/api/v1/resumes/{resume_id}/content",
+        headers=headers,
+        json={
+            "summary": "Experienced software engineer.",
+            "contact_visibility": {},
+            "sections": [
+                {"section_type": "summary", "visible": True, "item_ids": []},
+                {"section_type": "education", "visible": True, "item_ids": education_ids},
+            ],
+            "style": {"spacing": "relaxed"},
+        },
+    )
+
+    response = await client.post(
+        f"/api/v1/resumes/{resume_id}/autofit", headers=headers, params={"aggressive": "true"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    education_section = data["version"]["content"]["sections"][1]
+    # At least one lever beyond plain spacing/density was actually used --
+    # either some descriptions were condensed (an override recorded) or the
+    # lowest-priority (last-listed) entries were dropped outright.
+    assert data["version"]["content"]["description_overrides"] or len(
+        education_section["item_ids"]
+    ) < 12
+    # Whichever earlier-listed entries survive must still be present in
+    # order -- aggressive fit drops from the *end* (lowest position score),
+    # never reorders or drops from the middle/front.
+    assert education_section["item_ids"] == education_ids[: len(education_section["item_ids"])]
 
 
 async def test_export_resume_with_all_extended_section_types_renders_pdf(
@@ -473,6 +927,8 @@ async def test_export_resume_renders_for_every_template_with_custom_style(
         ["compact", "cozy", "relaxed", "compact", "cozy", "relaxed"],
         strict=False,
     ):
+        if slug == "ats_safe" and not _HAS_PDFLATEX:
+            continue
         template_id = next(
             t["id"] for t in templates_response.json()["data"] if t["slug"] == slug
         )
@@ -540,6 +996,8 @@ async def test_export_stays_legible_at_the_content_density_floor(
     education_id = education_response.json()["data"]["id"]
 
     for slug in slugs:
+        if slug == "ats_safe" and not _HAS_PDFLATEX:
+            continue
         template_id = next(
             t["id"] for t in templates_response.json()["data"] if t["slug"] == slug
         )
@@ -603,7 +1061,7 @@ async def test_delete_resume(client: AsyncClient, captured_emails: list[dict[str
     resume_id = create_response.json()["data"]["id"]
 
     delete_response = await client.delete(f"/api/v1/resumes/{resume_id}", headers=headers)
-    assert delete_response.status_code == 200
+    assert delete_response.status_code == 204
 
     get_response = await client.get(f"/api/v1/resumes/{resume_id}", headers=headers)
     assert get_response.status_code == 404

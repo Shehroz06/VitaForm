@@ -40,7 +40,7 @@ class ResumeService:
             raise ValidationException("Selected template is not available.")
 
         if content is not None:
-            await self._validate_item_ownership(profile_id, content)
+            await self._reconcile_item_ids(profile_id, content)
 
         resume = await self._resumes.create(
             profile_id=profile_id, template_id=template_id, title=title
@@ -103,7 +103,7 @@ class ResumeService:
         return version
 
     async def create_new_version(self, resume: Resume, content: ResumeContent) -> ResumeVersion:
-        await self._validate_item_ownership(resume.profile_id, content)
+        await self._reconcile_item_ids(resume.profile_id, content)
         latest = await self.get_latest_version(resume)
         return await self._versions.create_version(
             resume.id,
@@ -117,26 +117,43 @@ class ResumeService:
         content honest against whatever's on screen between explicit Saves,
         so Export always renders what the user actually sees rather than a
         stale, previously-saved snapshot."""
-        await self._validate_item_ownership(resume.profile_id, content)
+        await self._reconcile_item_ids(resume.profile_id, content)
         latest = await self.get_latest_version(resume)
         return await self._versions.update(latest, content=content.model_dump(mode="json"))
 
-    async def _validate_item_ownership(
-        self, profile_id: uuid.UUID, content: ResumeContent
-    ) -> None:
+    async def _reconcile_item_ids(self, profile_id: uuid.UUID, content: ResumeContent) -> None:
+        """Two different things can make a `section.item_ids` entry not
+        resolve, and they need different responses:
+
+        - An id that never belonged to this profile at all (forged, or from
+          another profile) is a real data-integrity error -- reject the
+          whole save, same as before.
+        - An id that belonged to this profile but was soft-deleted since the
+          resume was last saved is just a stale reference. renderer.py
+          already handles this at render time by silently omitting the
+          missing item (see its `if item_id in by_id` filter) -- without
+          mirroring that here, a resume in this state renders fine but can
+          never be saved again, permanently blocking the user from editing
+          it. Pruned instead of rejected, mutating `content` in place so the
+          caller's subsequent `model_dump` reflects the cleaned-up ids.
+        """
         for section in content.sections:
             model = SECTION_MODELS.get(section.section_type)
             if model is None or not section.item_ids:
                 continue
-            stmt = select(model.id).where(
+            stmt = select(model.id, model.deleted_at).where(
                 model.id.in_(section.item_ids),
                 model.profile_id == profile_id,  # type: ignore[attr-defined]
-                model.deleted_at.is_(None),
             )
-            owned_ids = {row[0] for row in (await self._db.execute(stmt)).all()}
-            missing = set(section.item_ids) - owned_ids
-            if missing:
+            rows = (await self._db.execute(stmt)).all()
+            owned_ids = {row[0] for row in rows}
+            live_ids = {row[0] for row in rows if row[1] is None}
+
+            forged = set(section.item_ids) - owned_ids
+            if forged:
                 raise ValidationException(
                     f"Invalid {section.section_type.value} item id(s): "
-                    f"{', '.join(str(i) for i in missing)}."
+                    f"{', '.join(str(i) for i in forged)}."
                 )
+
+            section.item_ids = [item_id for item_id in section.item_ids if item_id in live_ids]

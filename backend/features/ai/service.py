@@ -1,12 +1,16 @@
+import logging
+import uuid
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.settings import Settings
 from app.core.enums import GenerationStatus, SectionType
-from app.exceptions.base import BusinessRuleException, ValidationException
-from features.ai.candidates import load_candidate_items
+from app.exceptions.base import ServiceUnavailableException, ValidationException
+from features.ai.candidates import flatten_descriptions_by_item_id, load_candidate_items
 from features.ai.context_builder import build_candidates
+from features.ai.description_condenser import condense_description
+from features.ai.description_rewriter import rewrite_descriptions
 from features.ai.keyword_synonyms import expand_keywords
 from features.ai.page_fit import fit_resume_to_one_page, flatten_scores
 from features.ai.prompts import (
@@ -32,6 +36,8 @@ from features.resumes.repository import ResumeTemplateRepository
 from features.resumes.schemas import ContactVisibility, ResumeContent, ResumeSection
 from features.resumes.service import ResumeService
 
+logger = logging.getLogger("app.ai.generation")
+
 _RESUME_TEMPERATURE = 0.2
 _MAX_OUTPUT_TOKENS = 2000
 _DEFAULT_TEMPLATE_SLUG = "classic"
@@ -45,6 +51,28 @@ _RESUME_SECTION_ORDER = [
     SectionType.ACHIEVEMENTS,
     SectionType.AWARDS,
 ]
+
+
+def _jd_tailored_overrides(
+    content: ResumeContent,
+    descriptions_by_item_id: dict[uuid.UUID, str],
+    keywords: set[str],
+) -> dict[str, str]:
+    """Reorders each selected item's own sentences/bullets to lead with
+    whichever ones actually relate to this job description -- length is
+    unchanged (keep_ratio=1.0), only emphasis. Extractive only (see
+    description_condenser.py's module docstring): this can rearrange the
+    user's own words, never write new ones."""
+    overrides: dict[str, str] = {}
+    for section in content.sections:
+        for item_id in section.item_ids:
+            description = descriptions_by_item_id.get(item_id)
+            if not description:
+                continue
+            tailored = condense_description(description, keywords=keywords, keep_ratio=1.0)
+            if tailored is not None:
+                overrides[str(item_id)] = tailored
+    return overrides
 
 
 class GenerationService:
@@ -78,6 +106,33 @@ class GenerationService:
         self._provider_logs = provider_log_repository
         self._renderer = renderer
         self._templates = template_repository
+
+    async def rewrite_text(
+        self,
+        text: str,
+        *,
+        job_description: str | None,
+        target_role: str | None,
+    ) -> str | None:
+        """On-demand rewrite for the manual builder's "Rephrase with AI"
+        action -- reuses description_rewriter.py's fact-checked rewrite
+        rather than a separate code path, so a single item's description
+        and the resume's free-text summary go through the exact same
+        invent-nothing guarantee as generation-time rewriting. Stateless:
+        takes and returns plain text, not a resume/item id, so it works
+        identically for either. Returns None on any failure (provider
+        down, malformed response, failed fact-check) -- the builder keeps
+        whatever text was already there, same fallback behavior as
+        generation's best-effort rewrite step."""
+        sentinel_id = uuid.uuid4()
+        rewritten = await rewrite_descriptions(
+            self._settings,
+            self._prompt_history,
+            {sentinel_id: text},
+            job_description=job_description or "General resume polish (no specific job targeted).",
+            target_role=target_role,
+        )
+        return rewritten.get(sentinel_id)
 
     async def generate_resume(
         self,
@@ -123,11 +178,44 @@ class GenerationService:
             # triggers a rollback in get_db's error handling, which would
             # otherwise discard the very audit trail this call just wrote.
             await self._db.commit()
-            raise BusinessRuleException(
+            raise ServiceUnavailableException(
                 "AI resume generation is temporarily unavailable. Please try again shortly."
             )
 
         content = self._to_resume_content(run_result.value)
+        descriptions_by_item_id = flatten_descriptions_by_item_id(items_by_type)
+        jd_overrides = _jd_tailored_overrides(content, descriptions_by_item_id, keywords)
+
+        # Best-effort polish on top of the extractive reorder above: a real
+        # AI rewrite for phrasing, guarded by an automated fact-check
+        # (description_rewriter.py) instead of trusted on the model's word
+        # alone. Every failure mode -- provider down, malformed response, a
+        # rewrite that doesn't pass the fact-check, or any other error here
+        # -- just leaves that item's already-computed extractive override
+        # in place, so this can only ever improve phrasing, never break
+        # generation.
+        try:
+            selected_item_ids = {
+                item_id for section in content.sections for item_id in section.item_ids
+            }
+            rewrite_candidates = {
+                item_id: text
+                for item_id, text in descriptions_by_item_id.items()
+                if item_id in selected_item_ids
+            }
+            rewritten = await rewrite_descriptions(
+                self._settings,
+                self._prompt_history,
+                rewrite_candidates,
+                job_description=request.job_description,
+                target_role=request.target_role,
+            )
+            jd_overrides.update({str(item_id): text for item_id, text in rewritten.items()})
+        except Exception:  # noqa: BLE001
+            logger.exception("Description rewrite step failed; using extractive text instead.")
+
+        if jd_overrides:
+            content = content.model_copy(update={"description_overrides": jd_overrides})
         if request.accent_color:
             style = content.style.model_copy(update={"accent_color": request.accent_color})
             content = content.model_copy(update={"style": style})
@@ -160,6 +248,8 @@ class GenerationService:
             title=title,
             content=content,
             scores_by_item_id=flatten_scores(ranked),
+            descriptions_by_item_id=descriptions_by_item_id,
+            keywords=keywords,
         )
 
         resume = await self._resume_service.create_resume(profile.id, title, template.id, content)
