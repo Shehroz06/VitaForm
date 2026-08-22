@@ -221,12 +221,3 @@ export function mapPatents(items: Patent[] | undefined): ResumePreviewItem[] {
   }));
 }
 
-/** Editor checklists only need a short label -- derived from the same
- * normalized items the templates render, so there is one mapping step,
- * not two. */
-export function toSelectable(items: ResumePreviewItem[]): { id: string; label: string }[] {
-  return items.map((item) => ({
-    id: item.id,
-    label: item.subtitle ? `${item.title} — ${item.subtitle}` : item.title,
-  }));
-}

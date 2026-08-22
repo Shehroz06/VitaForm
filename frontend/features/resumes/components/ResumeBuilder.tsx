@@ -1,13 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { ArrowLeft, FileOutput, Undo2 } from "lucide-react";
+import { ArrowLeft, Code2, FileOutput, Shrink, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { useProfile } from "@/features/profile/hooks/use-profile";
 import { useAchievementList } from "@/features/profile/hooks/use-achievements";
 import { useAwardList } from "@/features/profile/hooks/use-awards";
 import { useCertificationList } from "@/features/profile/hooks/use-certifications";
@@ -24,13 +30,23 @@ import { useReferenceList } from "@/features/profile/hooks/use-references";
 import { useResearchList } from "@/features/profile/hooks/use-research";
 import { useSkillList } from "@/features/profile/hooks/use-skills";
 import { useVolunteerExperienceList } from "@/features/profile/hooks/use-volunteer-experience";
+import { ResumePreviewCard } from "@/features/resumes/components/ResumePreviewCard";
 import { ResumeSectionNav } from "@/features/resumes/components/ResumeSectionNav";
 import { SectionEditor, SummaryEditor } from "@/features/resumes/components/SectionEditor";
 import { TemplateCustomizer } from "@/features/resumes/components/TemplateCustomizer";
 import { TemplateSelector } from "@/features/resumes/components/TemplateSelector";
 import { VersionHistory } from "@/features/resumes/components/VersionHistory";
-import { CORE_SECTIONS, SECTION_LABELS, SECTION_ORDER } from "@/features/resumes/section-meta";
+import { resumeService } from "@/features/resumes/services/resume-service";
+import { configToStyle, styleToConfig } from "@/features/resumes/style-mapping";
 import {
+  CORE_SECTIONS,
+  ITEM_EDITABLE_SECTIONS,
+  SECTION_LABELS,
+  SECTION_ORDER,
+} from "@/features/resumes/section-meta";
+import {
+  useAutofitResume,
+  useAutofitResumeAggressive,
   useAutosaveResumeContent,
   useExportResume,
   useResumeContent,
@@ -56,45 +72,26 @@ import {
   mapResearch,
   mapSkills,
   mapVolunteerExperience,
-  toSelectable,
 } from "@/features/resumes/templates/item-mappers";
-import { TemplateRenderer } from "@/features/resumes/templates/TemplateRenderer";
-import type { ResumePreviewItem, ResumeTemplateData } from "@/features/resumes/templates/types";
+import type { ResumePreviewItem } from "@/features/resumes/templates/types";
 import type {
   ContactVisibility,
   Resume,
   ResumeContent,
   ResumeSection,
-  ResumeStyle,
   ResumeVersion,
   SectionType,
 } from "@/features/resumes/types";
 import { ApiError } from "@/services/api-client";
-import { useAuthStore } from "@/store/auth-store";
 
 interface BuilderState {
   summary: string;
   contact_visibility: ContactVisibility;
   sections: ResumeSection[];
   style: TemplateConfig;
-}
-
-function styleToConfig(style: ResumeStyle): TemplateConfig {
-  return {
-    accentColor: style.accent_color,
-    fontFamily: style.font_family,
-    spacing: style.spacing,
-    contentDensity: style.content_density,
-  };
-}
-
-function configToStyle(config: TemplateConfig): ResumeStyle {
-  return {
-    accent_color: config.accentColor,
-    font_family: config.fontFamily,
-    spacing: config.spacing,
-    content_density: config.contentDensity ?? 1,
-  };
+  descriptionOverrides: Record<string, string>;
+  titleOverrides: Record<string, string>;
+  subtitleOverrides: Record<string, string>;
 }
 
 function toBuilderState(
@@ -103,10 +100,18 @@ function toBuilderState(
   templateDefaultConfig: TemplateConfig,
 ): BuilderState {
   const bySectionType = new Map(content.sections.map((s) => [s.section_type, s]));
+  // Preserve the saved section order (so a reorder round-trips through
+  // autosave/reload) rather than always resetting to the canonical
+  // SECTION_ORDER -- any section type missing from a saved version (an
+  // older resume, or a type introduced after it was created) is appended
+  // at the end so nothing is silently dropped.
+  const savedOrder = content.sections.map((s) => s.section_type);
+  const missingTypes = SECTION_ORDER.filter((type) => !bySectionType.has(type));
+  const orderedTypes = [...savedOrder, ...missingTypes];
   return {
     summary: content.summary ?? "",
     contact_visibility: content.contact_visibility,
-    sections: SECTION_ORDER.map(
+    sections: orderedTypes.map(
       (type) =>
         bySectionType.get(type) ?? {
           section_type: type,
@@ -120,6 +125,9 @@ function toBuilderState(
     // show the template's own intended look until the user actually
     // customizes and saves, at which point content.style becomes authoritative.
     style: versionNumber <= 1 ? templateDefaultConfig : styleToConfig(content.style),
+    descriptionOverrides: content.description_overrides ?? {},
+    titleOverrides: content.title_overrides ?? {},
+    subtitleOverrides: content.subtitle_overrides ?? {},
   };
 }
 
@@ -135,58 +143,50 @@ function toContentPayload(state: BuilderState): ResumeContent {
       item_ids: s.section_type === "summary" ? [] : s.item_ids,
     })),
     style: configToStyle(state.style),
+    description_overrides: state.descriptionOverrides,
+    title_overrides: state.titleOverrides,
+    subtitle_overrides: state.subtitleOverrides,
   };
 }
 
-interface PreviewProfile {
-  headline: string | null;
-  phone: string | null;
-  location: string | null;
-  website_url: string | null;
-  github_url: string | null;
-  linkedin_url: string | null;
-}
+const _PLACEHOLDER_SUMMARY =
+  "Experienced professional with a track record of delivering results across engineering, research, and product work.";
 
-/** Resume Data -> the normalized contract every template renders from.
- * Runs once per render, independent of which template is selected -- the
- * same output feeds whichever TemplateRenderer the user has open. */
-function buildTemplateData(
-  fullName: string,
-  profile: PreviewProfile | undefined,
-  email: string | undefined,
-  state: BuilderState,
+/** A "fill every section with everything on your profile" ResumeContent --
+ * not this resume's actual saved selection, which might be sparse (a
+ * work-in-progress draft with only a couple of items toggled on). The
+ * template picker's comparison cards use this instead of the real
+ * selection so choosing a template is judged against a realistic amount
+ * of content, not whatever happens to be checked at that moment. */
+function buildMaximalPreviewContent(
+  summary: string,
   itemsByType: Record<Exclude<SectionType, "summary">, ResumePreviewItem[]>,
-): ResumeTemplateData {
-  const contactLine = [
-    state.contact_visibility.email && email,
-    state.contact_visibility.phone && profile?.phone,
-    state.contact_visibility.location && profile?.location,
-    state.contact_visibility.website && profile?.website_url,
-    state.contact_visibility.github && profile?.github_url,
-    state.contact_visibility.linkedin && profile?.linkedin_url,
-  ].filter((value): value is string => Boolean(value));
-
-  const summarySection = state.sections.find((s) => s.section_type === "summary");
-  const summary =
-    summarySection?.visible && state.summary.trim()
-      ? { title: summarySection.custom_title || "Summary", text: state.summary.trim() }
-      : null;
-
-  const sections = state.sections
-    .filter(
-      (s): s is ResumeSection & { section_type: Exclude<SectionType, "summary"> } =>
-        s.section_type !== "summary" && s.visible && s.item_ids.length > 0,
-    )
-    .map((s) => {
-      const byId = new Map(itemsByType[s.section_type].map((item) => [item.id, item]));
-      const items = s.item_ids
-        .map((id) => byId.get(id))
-        .filter((item): item is ResumePreviewItem => Boolean(item));
-      return { type: s.section_type, title: s.custom_title || SECTION_LABELS[s.section_type], items };
-    })
-    .filter((section) => section.items.length > 0);
-
-  return { fullName, headline: profile?.headline ?? null, contactLine, summary, sections };
+): ResumeContent {
+  return {
+    summary: summary.trim() || _PLACEHOLDER_SUMMARY,
+    contact_visibility: {
+      phone: true,
+      location: true,
+      website: true,
+      github: true,
+      linkedin: true,
+      email: true,
+    },
+    sections: SECTION_ORDER.map((type) =>
+      type === "summary"
+        ? { section_type: type, custom_title: null, visible: true, item_ids: [] }
+        : {
+            section_type: type,
+            custom_title: null,
+            visible: true,
+            item_ids: itemsByType[type].map((item) => item.id),
+          },
+    ),
+    style: configToStyle({ accentColor: "#1a1a1a", fontFamily: "arial", spacing: "cozy" }),
+    description_overrides: {},
+    title_overrides: {},
+    subtitle_overrides: {},
+  };
 }
 
 export function ResumeBuilder({ resumeId }: { resumeId: string }) {
@@ -224,14 +224,14 @@ function ResumeBuilderForm({
   resume: Resume;
   version: ResumeVersion;
 }) {
+  const queryClient = useQueryClient();
   const updateResume = useUpdateResume();
   const updateContent = useUpdateResumeContent(resumeId);
   const autosaveContent = useAutosaveResumeContent(resumeId);
   const exportResume = useExportResume(resumeId);
+  const autofitResume = useAutofitResume(resumeId);
+  const autofitResumeAggressive = useAutofitResumeAggressive(resumeId);
   const { data: templates } = useResumeTemplates();
-  const user = useAuthStore((state) => state.user);
-  const { data: profile } = useProfile();
-  const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(" ");
 
   const currentTemplate = templates?.find((t) => t.id === resume.template_id);
   const currentSlug = currentTemplate?.slug ?? "classic";
@@ -245,6 +245,7 @@ function ResumeBuilderForm({
     () => new Set<SectionType>(["summary", ...CORE_SECTIONS]),
   );
   const [isDirty, setIsDirty] = useState(false);
+  const [isExportingTex, setIsExportingTex] = useState(false);
 
   // Undo history + autosave share one debounce: whenever the user pauses
   // editing for AUTOSAVE_DEBOUNCE_MS, the state as it was *before* this
@@ -332,7 +333,7 @@ function ResumeBuilderForm({
     patents: mapPatents(patents),
   };
 
-  const templateData = buildTemplateData(fullName, profile, user?.email, state, itemsByType);
+  const maximalPreviewContent = buildMaximalPreviewContent(state.summary, itemsByType);
 
   const updateStyle = (patch: Partial<TemplateConfig>) => {
     setState((prev) => ({ ...prev, style: { ...prev.style, ...patch } }));
@@ -347,6 +348,39 @@ function ResumeBuilderForm({
       const sections = [...prev.sections];
       sections[index] = next;
       return { ...prev, sections };
+    });
+  };
+
+  const moveSection = (index: number, direction: -1 | 1) => {
+    setState((prev) => {
+      const target = index + direction;
+      if (target < 0 || target >= prev.sections.length) return prev;
+      const sections = [...prev.sections];
+      [sections[index], sections[target]] = [sections[target], sections[index]];
+      return { ...prev, sections };
+    });
+  };
+
+  const overrideKeyFor = {
+    title: "titleOverrides",
+    subtitle: "subtitleOverrides",
+    description: "descriptionOverrides",
+  } as const;
+
+  const updateOverride = (
+    field: "title" | "subtitle" | "description",
+    itemId: string,
+    value: string,
+  ) => {
+    setState((prev) => {
+      const key = overrideKeyFor[field];
+      const next = { ...prev[key] };
+      if (value.trim()) {
+        next[itemId] = value;
+      } else {
+        delete next[itemId];
+      }
+      return { ...prev, [key]: next };
     });
   };
 
@@ -379,7 +413,13 @@ function ResumeBuilderForm({
     updateResume.mutate(
       { id: resume.id, payload: { template_id: templateId } },
       {
-        onSuccess: () => toast.success("Template updated."),
+        onSuccess: () => {
+          toast.success("Template updated.");
+          // The rendered preview image is a function of resume.template_id,
+          // not just the content useAutosaveResumeContent already
+          // invalidates -- switching templates needs its own invalidation.
+          queryClient.invalidateQueries({ queryKey: ["resumes", resumeId, "preview"] });
+        },
         onError: () => toast.error("Failed to update template."),
       },
     );
@@ -412,6 +452,47 @@ function ResumeBuilderForm({
     });
   };
 
+  const handleAutofit = () => {
+    autofitResume.mutate(undefined, {
+      onSuccess: (result) => {
+        setState((prev) => ({ ...prev, style: styleToConfig(result.version.content.style) }));
+        toast[result.overflowing ? "warning" : "success"](
+          result.overflowing
+            ? "Tightened spacing as much as possible, but content still exceeds one page — remove or shorten something."
+            : "Resume now fits one page.",
+        );
+      },
+      onError: (error) => {
+        toast.error(error instanceof ApiError ? error.message : "Failed to auto-fit resume.");
+      },
+    });
+  };
+
+  const handleAutofitAggressive = () => {
+    autofitResumeAggressive.mutate(undefined, {
+      onSuccess: (result) => {
+        // Unlike plain autofit (style only), this can also condense
+        // descriptions and drop items -- sync everything the server could
+        // have changed, keeping summary/contact_visibility/title+subtitle
+        // overrides as-is since page_fit.py never touches those.
+        setState((prev) => ({
+          ...prev,
+          sections: result.version.content.sections,
+          style: styleToConfig(result.version.content.style),
+          descriptionOverrides: result.version.content.description_overrides ?? {},
+        }));
+        toast[result.overflowing ? "warning" : "success"](
+          result.overflowing
+            ? "Shortened and trimmed as much as possible, but content still exceeds one page — remove something yourself."
+            : "Resume now fits one page — some descriptions were shortened or lower-priority items removed. Undo (Ctrl/Cmd+Z) if you'd rather choose yourself.",
+        );
+      },
+      onError: (error) => {
+        toast.error(error instanceof ApiError ? error.message : "Failed to auto-fit resume.");
+      },
+    });
+  };
+
   const handleExport = () => {
     exportResume.mutate(undefined, {
       onSuccess: (file) => {
@@ -422,6 +503,18 @@ function ResumeBuilderForm({
         toast.error(error instanceof ApiError ? error.message : "Failed to export resume.");
       },
     });
+  };
+
+  const handleExportTex = async () => {
+    setIsExportingTex(true);
+    try {
+      await resumeService.exportTex(resumeId, `${title || "resume"}.tex`);
+      toast.success(".tex source downloaded.");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Failed to download .tex source.");
+    } finally {
+      setIsExportingTex(false);
+    }
   };
 
   return (
@@ -445,9 +538,10 @@ function ResumeBuilderForm({
             v{resume.latest_version_number}
           </span>
           <TemplateSelector
+            resumeId={resumeId}
             currentSlug={currentSlug}
             currentName={currentTemplate?.name ?? "Template"}
-            previewData={templateData}
+            previewContent={maximalPreviewContent}
             onSelect={handleTemplateSelect}
           />
           <TemplateCustomizer config={state.style} onChange={updateStyle} onReset={resetStyle} />
@@ -479,10 +573,63 @@ function ResumeBuilderForm({
             >
               {updateContent.isPending ? "Saving..." : "Save version"}
             </Button>
-            <Button onClick={handleExport} disabled={exportResume.isPending} size="sm" className="gap-1.5">
-              <FileOutput className="size-4" />
-              {exportResume.isPending ? "Exporting..." : "Export PDF"}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  disabled={autofitResume.isPending || autofitResumeAggressive.isPending}
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  title="Fit this resume to one page"
+                >
+                  <Shrink className="size-4" />
+                  {autofitResume.isPending || autofitResumeAggressive.isPending
+                    ? "Fitting..."
+                    : "Auto-fit"}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={handleAutofit}>
+                  <Shrink className="size-4" />
+                  Auto-fit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleAutofitAggressive}
+                  className="text-amber-700 dark:text-amber-500"
+                  title="Go further: shorten descriptions or remove the lowest-priority items if needed to fit one page"
+                >
+                  <Shrink className="size-4" />
+                  Extreme fit
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  disabled={exportResume.isPending || isExportingTex}
+                  size="sm"
+                  className="gap-1.5"
+                >
+                  <FileOutput className="size-4" />
+                  {exportResume.isPending ? "Exporting..." : "Export CV"}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExport}>
+                  <FileOutput className="size-4" />
+                  Export PDF
+                </DropdownMenuItem>
+                {currentSlug === "ats_safe" && (
+                  <DropdownMenuItem
+                    onClick={handleExportTex}
+                    title="Download the raw .tex source this template compiles -- verify or recompile it yourself, e.g. in Overleaf"
+                  >
+                    <Code2 className="size-4" />
+                    Download .tex
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
@@ -493,11 +640,11 @@ function ResumeBuilderForm({
           <span className="text-xs text-muted-foreground group-open:hidden">Tap to show</span>
         </summary>
         <div className="border-t border-border p-4">
-          <TemplateRenderer slug={currentSlug} data={templateData} config={state.style} />
+          <ResumePreviewCard resumeId={resumeId} />
         </div>
       </details>
 
-      <div className="mx-auto grid w-full max-w-[1400px] flex-1 gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[200px_1fr_560px] lg:items-start">
+      <div className="mx-auto grid w-full max-w-[1400px] flex-1 gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[180px_1fr_430px] lg:items-start">
         <aside className="hidden lg:sticky lg:top-32 lg:block">
           <ResumeSectionNav sections={state.sections} onNavigate={handleNavigate} />
         </aside>
@@ -530,20 +677,35 @@ function ResumeBuilderForm({
                   key="summary"
                   section={section}
                   summary={state.summary}
+                  resumeId={resumeId}
                   open={expanded.has("summary")}
                   onToggleOpen={() => toggleOpen("summary")}
                   onSectionChange={(next) => updateSection(index, next)}
                   onSummaryChange={(text) => setState((prev) => ({ ...prev, summary: text }))}
+                  onMoveUp={() => moveSection(index, -1)}
+                  onMoveDown={() => moveSection(index, 1)}
+                  canMoveUp={index > 0}
+                  canMoveDown={index < state.sections.length - 1}
                 />
               ) : (
                 <SectionEditor
                   key={section.section_type}
                   section={section}
                   defaultTitle={SECTION_LABELS[section.section_type]}
-                  items={toSelectable(itemsByType[section.section_type])}
+                  items={itemsByType[section.section_type]}
+                  editable={ITEM_EDITABLE_SECTIONS.has(section.section_type)}
                   open={expanded.has(section.section_type)}
                   onToggleOpen={() => toggleOpen(section.section_type)}
                   onChange={(next) => updateSection(index, next)}
+                  onMoveUp={() => moveSection(index, -1)}
+                  onMoveDown={() => moveSection(index, 1)}
+                  canMoveUp={index > 0}
+                  canMoveDown={index < state.sections.length - 1}
+                  resumeId={resumeId}
+                  titleOverrides={state.titleOverrides}
+                  subtitleOverrides={state.subtitleOverrides}
+                  descriptionOverrides={state.descriptionOverrides}
+                  onOverrideChange={updateOverride}
                 />
               ),
             )}
@@ -565,7 +727,7 @@ function ResumeBuilderForm({
             maxWidth: "min(640px, calc((100vh - 11rem) * 0.7071))",
           }}
         >
-          <TemplateRenderer slug={currentSlug} data={templateData} config={state.style} />
+          <ResumePreviewCard resumeId={resumeId} />
         </aside>
       </div>
     </div>

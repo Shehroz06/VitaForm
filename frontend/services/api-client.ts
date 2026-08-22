@@ -54,7 +54,7 @@ async function refreshAccessToken(): Promise<boolean> {
   return true;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function requestWithRetry(path: string, init?: RequestInit): Promise<Response> {
   let response = await rawRequest(path, init);
 
   if (response.status === 401 && !NO_RETRY_PATHS.includes(path)) {
@@ -66,6 +66,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
   }
 
+  return response;
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await requestWithRetry(path, init);
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   const body = (await response.json()) as ApiResponse<T>;
 
   if (!body.success) {
@@ -73,6 +83,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return body.data;
+}
+
+// For endpoints that return raw binary (e.g. the resume preview image)
+// instead of the standard {success, data} JSON envelope -- request()'s
+// .json() parsing doesn't apply here, but the same 401-refresh-retry
+// behavior does, so this shares requestWithRetry rather than duplicating it.
+async function requestBlob(
+  path: string,
+  init?: RequestInit,
+): Promise<{ blob: Blob; headers: Headers }> {
+  const response = await requestWithRetry(path, init);
+  if (!response.ok) {
+    throw new ApiError(`Request failed with status ${response.status}`, response.status);
+  }
+  return { blob: await response.blob(), headers: response.headers };
 }
 
 export const apiClient = {
@@ -88,5 +113,43 @@ export const apiClient = {
     const formData = new FormData();
     formData.append("file", file);
     return request<T>(path, { method: "POST", body: formData });
+  },
+  getBlob: async (path: string): Promise<{ blob: Blob; pageCount: number }> => {
+    const { blob, headers } = await requestBlob(path, { method: "GET" });
+    const pageCount = Number(headers.get("X-Page-Count") ?? "1");
+    return { blob, pageCount: Number.isFinite(pageCount) && pageCount > 0 ? pageCount : 1 };
+  },
+  // Same contract as getBlob, but for endpoints that render a POSTed body
+  // (e.g. "preview this not-yet-saved content against template X") rather
+  // than GETting an already-saved resource.
+  postBlob: async (path: string, data: unknown): Promise<{ blob: Blob; pageCount: number }> => {
+    const { blob, headers } = await requestBlob(path, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    const pageCount = Number(headers.get("X-Page-Count") ?? "1");
+    return { blob, pageCount: Number.isFinite(pageCount) && pageCount > 0 ? pageCount : 1 };
+  },
+  // Fetches an authenticated binary/text response and saves it as a file --
+  // a plain <a href> can't carry the Authorization header this API requires,
+  // so the browser's native download flow doesn't apply directly; this
+  // fetches the bytes ourselves and hands them to the browser via a
+  // throwaway object URL instead. Reads the real filename off
+  // Content-Disposition when the server sends one (every endpoint that
+  // supports this does), falling back to `fallbackFilename` otherwise.
+  downloadFile: async (path: string, fallbackFilename: string): Promise<void> => {
+    const { blob, headers } = await requestBlob(path, { method: "GET" });
+    const disposition = headers.get("Content-Disposition") ?? "";
+    const match = /filename="?([^"]+)"?/.exec(disposition);
+    const filename = match?.[1] ?? fallbackFilename;
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   },
 };

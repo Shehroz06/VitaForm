@@ -39,7 +39,10 @@ export interface ResumeSection {
  * (fonts-liberation), calibri/georgia need fonts-crosextra-carlito/caladea.
  */
 export type FontFamily = "arial" | "calibri" | "times" | "georgia";
-export type Spacing = "compact" | "cozy" | "relaxed";
+// "extreme" is computed-only -- like content_density, the autofit search
+// sets it automatically when "compact" alone still overflows; it's
+// deliberately not offered as a manual choice (see TemplateCustomizer).
+export type Spacing = "compact" | "cozy" | "relaxed" | "extreme";
 
 /**
  * Visual knobs the exported PDF actually renders with -- part of the real,
@@ -61,6 +64,14 @@ export interface ResumeContent {
   contact_visibility: ContactVisibility;
   sections: ResumeSection[];
   style: ResumeStyle;
+  // Resume-scoped-only text overrides, keyed by item id -- never written
+  // back to the profile's own record. AI generation can set these, and the
+  // manual builder can too (see ResumeBuilder's ItemOverrides UI) -- both
+  // read/write the exact same fields, so a manual edit after AI generation
+  // never gets silently dropped by the next autosave.
+  description_overrides: Record<string, string>;
+  title_overrides: Record<string, string>;
+  subtitle_overrides: Record<string, string>;
 }
 
 export interface ResumeTemplate {
@@ -107,6 +118,14 @@ export interface ResumeVersionSummary {
   created_at: string;
 }
 
+export interface AutofitResult {
+  version: ResumeVersion;
+  // True if the content still doesn't fit one page even at the tightest
+  // lossless spacing/density -- means a human needs to shorten or remove
+  // something, autofit never deletes content itself.
+  overflowing: boolean;
+}
+
 export interface ExportedResumeFile {
   id: string;
   original_filename: string;
@@ -124,6 +143,19 @@ export interface ResumeGeneratePayload {
   job_description: string;
   target_role?: string | null;
   target_company?: string | null;
+}
+
+export interface RewriteTextPayload {
+  text: string;
+  job_description?: string | null;
+  target_role?: string | null;
+}
+
+export interface RewriteTextResult {
+  // null means the rewrite didn't produce a usable result (no provider
+  // configured, malformed response, or it failed the fact-check) -- not an
+  // error; the caller should just keep the original text.
+  rewritten_text: string | null;
 }
 
 export interface GenerateResumeResponse {

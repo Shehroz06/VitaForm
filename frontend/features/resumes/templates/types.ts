@@ -1,11 +1,11 @@
-import type { ComponentType } from "react";
-import type { FontFamily, SectionType, Spacing } from "@/features/resumes/types";
+import type { FontFamily, Spacing } from "@/features/resumes/types";
 
 /**
- * The one shape every template renders from. Built once (in item-mappers.ts)
- * from the raw profile API objects, so no template component ever touches
- * an Education/Experience/Project/etc. type directly -- templates are pure
- * presentation over this normalized contract.
+ * The one shape every section-item consumer renders from (SectionEditor's
+ * per-item editing, the template picker's preview content, the builder's
+ * itemsByType). Built once (in item-mappers.ts) from the raw profile API
+ * objects, so no downstream code ever touches an Education/Experience/
+ * Project/etc. type directly.
  */
 export interface ResumePreviewItem {
   id: string;
@@ -20,20 +20,6 @@ export interface ResumePreviewItem {
   description?: string | null;
   tags?: string[];
   links?: string[];
-}
-
-export interface ResumeTemplateSection {
-  type: Exclude<SectionType, "summary">;
-  title: string;
-  items: ResumePreviewItem[];
-}
-
-export interface ResumeTemplateData {
-  fullName: string;
-  headline: string | null;
-  contactLine: string[];
-  summary: { title: string; text: string } | null;
-  sections: ResumeTemplateSection[];
 }
 
 export type TemplateSlug = "classic" | "modern" | "minimal" | "compact" | "executive" | "ats_safe";
@@ -60,15 +46,9 @@ export interface TemplateConfig {
   contentDensity?: number;
 }
 
-export interface TemplateProps {
-  data: ResumeTemplateData;
-  config: TemplateConfig;
-}
-
 export interface TemplateDefinition {
   slug: TemplateSlug;
   name: string;
   description: string;
-  component: ComponentType<TemplateProps>;
   defaultConfig: TemplateConfig;
 }

@@ -44,6 +44,19 @@ export const SECTION_ORDER: SectionType[] = [
 // editor reads as a document, not a 17-card wall of forms.
 export const CORE_SECTIONS: SectionType[] = ["education", "experience", "projects", "skills"];
 
+// Skills/Languages/References render as simple inline lists with no
+// per-entry title/org/description of their own -- mirrors the backend's
+// TITLE_FIELDS registry (section_registry.py), which is exactly the set of
+// section types a title_override/subtitle_override/description_override
+// is meaningful for. Every other section type has a "sub-heading" (its own
+// title, and usually an org/institution line) worth editing per resume.
+export const ITEM_EDITABLE_SECTIONS = new Set<SectionType>(
+  SECTION_ORDER.filter(
+    (type): type is Exclude<SectionType, "summary" | "skills" | "languages" | "references"> =>
+      type !== "summary" && type !== "skills" && type !== "languages" && type !== "references",
+  ),
+);
+
 export const SECTION_LABELS: Record<Exclude<SectionType, "summary">, string> = {
   education: "Education",
   experience: "Experience",

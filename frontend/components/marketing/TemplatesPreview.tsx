@@ -8,6 +8,7 @@ import { useResumeTemplates } from "@/features/resumes/hooks/use-resumes";
 import { cn } from "@/lib/utils";
 
 const ACCENTS = [
+  { name: "Black", value: "#000000" },
   { name: "Wood Brown", value: "#8b5e3c" },
   { name: "Navy", value: "#35507e" },
   { name: "Emerald", value: "#2f6f56" },
@@ -103,7 +104,12 @@ export function TemplatesPreview() {
           </div>
 
           {selected && (
-            <div className="mx-auto flex h-full w-full max-w-[280px] flex-col justify-center">
+            // No h-full here: the grid's items-stretch already gives this
+            // column a definite height, and adding h-full on top of that
+            // pressures TemplateMockup's own aspect-[210/297] box to share
+            // it rather than size purely from its own width -- letting the
+            // wrapper size to content keeps the card genuinely A4-shaped.
+            <div className="mx-auto flex w-full max-w-[280px] flex-col justify-center">
               <TemplateMockup slug={selected.slug} accent={accent} />
             </div>
           )}
