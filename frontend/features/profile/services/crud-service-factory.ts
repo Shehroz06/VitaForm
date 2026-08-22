@@ -6,6 +6,6 @@ export function createCrudService<TItem, TPayload>(resourcePath: string) {
     create: (payload: TPayload) => apiClient.post<TItem>(resourcePath, payload),
     update: (id: string, payload: Partial<TPayload>) =>
       apiClient.patch<TItem>(`${resourcePath}/${id}`, payload),
-    remove: (id: string) => apiClient.delete<{ message: string }>(`${resourcePath}/${id}`),
+    remove: (id: string) => apiClient.delete<void>(`${resourcePath}/${id}`),
   };
 }

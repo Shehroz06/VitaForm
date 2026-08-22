@@ -11,7 +11,7 @@ export const jobService = {
   create: (payload: JobDescriptionCreatePayload) =>
     apiClient.post<JobDescription>("/jobs", payload),
   get: (id: string) => apiClient.get<JobDescription>(`/jobs/${id}`),
-  remove: (id: string) => apiClient.delete<{ message: string }>(`/jobs/${id}`),
+  remove: (id: string) => apiClient.delete<void>(`/jobs/${id}`),
   analyze: (rawText: string) =>
     apiClient.post<JobAnalysis>("/jobs/analyze", { raw_text: rawText }),
   computeAtsScore: (id: string) => apiClient.post<AtsScore>(`/jobs/${id}/ats-score`),

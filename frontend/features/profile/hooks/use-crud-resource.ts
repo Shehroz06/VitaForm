@@ -4,7 +4,7 @@ interface CrudService<TItem, TPayload> {
   list: () => Promise<TItem[]>;
   create: (payload: TPayload) => Promise<TItem>;
   update: (id: string, payload: Partial<TPayload>) => Promise<TItem>;
-  remove: (id: string) => Promise<{ message: string }>;
+  remove: (id: string) => Promise<void>;
 }
 
 export const PROFILE_QUERY_KEY = ["profile", "me"];

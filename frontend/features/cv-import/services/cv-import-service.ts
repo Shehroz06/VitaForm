@@ -12,5 +12,5 @@ export const cvImportService = {
   confirm: (id: string, payload: ImportConfirmPayload) =>
     apiClient.post<ImportConfirmResult>(`/cv-import/sessions/${id}/confirm`, payload),
   reject: (id: string) => apiClient.post<ImportSession>(`/cv-import/sessions/${id}/reject`),
-  remove: (id: string) => apiClient.delete<{ message: string }>(`/cv-import/sessions/${id}`),
+  remove: (id: string) => apiClient.delete<void>(`/cv-import/sessions/${id}`),
 };

@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface AttachmentService<TItem> {
   upload: (id: string, file: File) => Promise<TItem>;
-  remove: (id: string) => Promise<{ message: string }>;
+  remove: (id: string) => Promise<void>;
 }
 
 export function createAttachmentHooks<TItem>(
