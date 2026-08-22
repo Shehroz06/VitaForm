@@ -26,9 +26,18 @@ const A4_RATIO = 297 / 210;
 export function ResumePreviewCard({
   resumeId,
   className,
+  fillHeight = false,
 }: {
   resumeId: string;
   className?: string;
+  // Desktop's sticky sidebar gives this card a real, explicit height (see
+  // ResumeBuilder.tsx's aside) so the preview can size itself to reach the
+  // bottom of that space instead of floating above it -- this flips the
+  // measurement direction (measure height, derive width) to make that
+  // possible. Mobile's collapsible panel has no such height (it's sized by
+  // its own content), so it keeps the original width-driven-height mode,
+  // the only one that works when there's no externally imposed height.
+  fillHeight?: boolean;
 }) {
   const { data, isFetching, isError, error } = useResumePreview(resumeId);
   // The URLs are derived state (computed from the fetched blobs), not
@@ -63,37 +72,48 @@ export function ResumePreviewCard({
   // about whether the box holds its computed height or grows to fit
   // content that wants to be taller -- which is exactly the ambiguity that
   // would make multi-page content silently clip instead of scroll. Sidestep
-  // it entirely: measure the container's actual rendered width and set an
-  // explicit pixel height from it. An explicit height with overflow-y:auto
-  // has no ambiguity in any browser -- content taller than that height
-  // scrolls, full stop. (auto, not scroll: a single-page resume has
-  // nothing to scroll to, and a permanently-shown scrollbar that doesn't
-  // move reads as broken, not as "there's more below.")
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [heightPx, setHeightPx] = useState<number | null>(null);
+  // it entirely: measure the real box this card has to fit in and compute
+  // an explicit pixel width/height for it directly, "object-fit: contain"
+  // style. An explicit size with overflow-y:auto has no ambiguity in any
+  // browser -- content taller than that height scrolls, full stop. (auto,
+  // not scroll: a single-page resume has nothing to scroll to, and a
+  // permanently-shown scrollbar that doesn't move reads as broken, not as
+  // "there's more below.")
+  //
+  // Mobile's collapsible panel has no externally imposed height (it's
+  // sized by its own content) -- offsetHeight there would just reflect
+  // whatever height the card last rendered at, feeding back into its own
+  // input. `fillHeight` selects which real box to fit into: the wrapper's
+  // full (width, height) when it has both, and just its width otherwise.
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [dims, setDims] = useState<{ width: number; height: number } | null>(null);
 
   useEffect(() => {
-    const el = containerRef.current;
+    const el = wrapperRef.current;
     if (!el) return;
-    const updateHeight = () => setHeightPx(el.offsetWidth * A4_RATIO);
-    updateHeight();
-    const observer = new ResizeObserver(updateHeight);
+    const update = () => {
+      const width = fillHeight
+        ? Math.min(el.offsetWidth, el.offsetHeight / A4_RATIO)
+        : el.offsetWidth;
+      setDims({ width, height: width * A4_RATIO });
+    };
+    update();
+    const observer = new ResizeObserver(update);
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [fillHeight]);
 
   return (
-    <div className="relative">
+    <div ref={wrapperRef} className={cn("relative", fillHeight && "h-full")}>
       <div
-        ref={containerRef}
-        style={heightPx ? { height: heightPx } : undefined}
+        style={dims ? { width: dims.width, height: dims.height } : undefined}
         className={cn(
-          "relative w-full overflow-y-auto bg-white shadow-lg ring-1 ring-black/10",
+          "relative mx-auto overflow-y-auto bg-white shadow-lg ring-1 ring-black/10",
           className,
         )}
       >
         {imageUrls && (
-          <div className="flex flex-col gap-2 bg-neutral-200 p-2">
+          <div className="flex flex-col gap-6 bg-neutral-200 p-2">
             {imageUrls.map((url, index) => (
               // eslint-disable-next-line @next/next/no-img-element -- fetched, authenticated blob URLs, not static assets next/image can optimize
               <img

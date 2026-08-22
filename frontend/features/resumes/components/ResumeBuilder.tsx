@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { ArrowLeft, Code2, FileOutput, Shrink, Undo2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, Code2, FileOutput, Shrink, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -82,6 +82,7 @@ import type {
   ResumeVersion,
   SectionType,
 } from "@/features/resumes/types";
+import { cn } from "@/lib/utils";
 import { ApiError } from "@/services/api-client";
 
 interface BuilderState {
@@ -573,63 +574,78 @@ function ResumeBuilderForm({
             >
               {updateContent.isPending ? "Saving..." : "Save version"}
             </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  disabled={autofitResume.isPending || autofitResumeAggressive.isPending}
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  title="Fit this resume to one page"
-                >
-                  <Shrink className="size-4" />
-                  {autofitResume.isPending || autofitResumeAggressive.isPending
-                    ? "Fitting..."
-                    : "Auto-fit"}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={handleAutofit}>
-                  <Shrink className="size-4" />
-                  Auto-fit
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleAutofitAggressive}
-                  className="text-amber-700 dark:text-amber-500"
-                  title="Go further: shorten descriptions or remove the lowest-priority items if needed to fit one page"
-                >
-                  <Shrink className="size-4" />
-                  Extreme fit
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  disabled={exportResume.isPending || isExportingTex}
-                  size="sm"
-                  className="gap-1.5"
-                >
-                  <FileOutput className="size-4" />
-                  {exportResume.isPending ? "Exporting..." : "Export CV"}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExport}>
-                  <FileOutput className="size-4" />
-                  Export PDF
-                </DropdownMenuItem>
-                {currentSlug === "ats_safe" && (
-                  <DropdownMenuItem
-                    onClick={handleExportTex}
-                    title="Download the raw .tex source this template compiles -- verify or recompile it yourself, e.g. in Overleaf"
+            <div className="flex">
+              <Button
+                onClick={handleAutofit}
+                disabled={autofitResume.isPending || autofitResumeAggressive.isPending}
+                variant="outline"
+                size="sm"
+                className="gap-1.5 rounded-r-none"
+                title="Tighten spacing to fit one page without removing anything"
+              >
+                <Shrink className="size-4" />
+                {autofitResume.isPending || autofitResumeAggressive.isPending
+                  ? "Fitting..."
+                  : "Auto-fit"}
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    disabled={autofitResume.isPending || autofitResumeAggressive.isPending}
+                    variant="outline"
+                    size="sm"
+                    className="rounded-l-none border-l-0 px-1.5"
+                    aria-label="More fit options"
                   >
-                    <Code2 className="size-4" />
-                    Download .tex
+                    <ChevronDown className="size-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={handleAutofitAggressive}
+                    className="text-amber-700 dark:text-amber-500"
+                    title="Go further: shorten descriptions or remove the lowest-priority items if needed to fit one page"
+                  >
+                    <Shrink className="size-4" />
+                    Extreme fit
                   </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <div className="flex">
+              <Button
+                onClick={handleExport}
+                disabled={exportResume.isPending || isExportingTex}
+                size="sm"
+                className={cn("gap-1.5", currentSlug === "ats_safe" && "rounded-r-none")}
+              >
+                <FileOutput className="size-4" />
+                {exportResume.isPending ? "Exporting..." : "Export CV"}
+              </Button>
+              {currentSlug === "ats_safe" && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      disabled={exportResume.isPending || isExportingTex}
+                      size="sm"
+                      className="rounded-l-none border-l border-l-primary-foreground/20 px-1.5"
+                      aria-label="More export options"
+                    >
+                      <ChevronDown className="size-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={handleExportTex}
+                      title="Download the raw .tex source this template compiles -- verify or recompile it yourself, e.g. in Overleaf"
+                    >
+                      <Code2 className="size-4" />
+                      Download .tex
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -644,7 +660,11 @@ function ResumeBuilderForm({
         </div>
       </details>
 
-      <div className="mx-auto grid w-full max-w-[1400px] flex-1 gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[180px_1fr_430px] lg:items-start">
+      {/* 200px nav + 490px preview matches this morning's original layout
+          (200px_1fr_560px) minus 70px handed from the preview column to the
+          center editor column, per your request -- nav is back to its
+          original width, not the 180px I'd shrunk it to earlier today. */}
+      <div className="mx-auto grid w-full max-w-[1400px] flex-1 gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[200px_1fr_490px] lg:items-start">
         <aside className="hidden lg:sticky lg:top-32 lg:block">
           <ResumeSectionNav sections={state.sections} onNavigate={handleNavigate} />
         </aside>
@@ -717,17 +737,16 @@ function ResumeBuilderForm({
         <aside
           className="hidden lg:sticky lg:top-32 lg:mx-auto lg:block lg:w-full"
           style={{
-            // Cap by whichever is smaller: a comfortable print-scale width,
-            // or whatever width keeps the full A4-ratio page inside the
-            // viewport under the sticky offset. Without the height-aware
-            // half, a wide preview taller than the screen forces the whole
-            // page to scroll just to see its bottom -- the point of sticky
-            // positioning is that it stays fully visible while the editor
-            // column scrolls past it, not the other way around.
-            maxWidth: "min(640px, calc((100vh - 11rem) * 0.7071))",
+            // An explicit height (not a width cap) is what lets the card
+            // fill down to the bottom of the available space with genuine
+            // padding, rather than floating above it at whatever height a
+            // width-first calculation happened to produce. 11rem accounts
+            // for the sticky top offset; the trailing 2rem is that bottom
+            // padding.
+            height: "calc(100vh - 11rem - 2rem)",
           }}
         >
-          <ResumePreviewCard resumeId={resumeId} />
+          <ResumePreviewCard resumeId={resumeId} fillHeight />
         </aside>
       </div>
     </div>
