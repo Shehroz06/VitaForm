@@ -88,10 +88,10 @@
 \section*{\VAR{section.title | latex_escape}}
 \BLOCK{for item in section.entries}
 \resumeSubheading
-  {\VAR{item.job_title | latex_escape} \textperiodcentered\ \VAR{item.company_name | latex_escape}}
+  {\VAR{item.company_name | latex_escape}}
+  {\BLOCK{if item.location}\VAR{item.location | latex_escape}\BLOCK{endif}}
+  {\VAR{item.job_title | latex_escape}}
   {\VAR{item.start_date.strftime("%b %Y") if item.start_date else ""} -- \VAR{"Present" if item.is_current else (item.end_date.strftime("%b %Y") if item.end_date else "")}}
-  {\VAR{item.employment_type.value.replace("_", " ").title() | latex_escape}\BLOCK{if item.location} \textperiodcentered\ \VAR{item.location | latex_escape}\BLOCK{endif}}
-  { }
 \BLOCK{if item.description}\VAR{item.description | format_description}\BLOCK{endif}
 \BLOCK{endfor}
 
@@ -100,12 +100,9 @@
 \BLOCK{for item in section.entries}
 \resumeEntryHeading
   {\VAR{item.title | latex_escape}\BLOCK{if item.role} \textperiodcentered\ \textit{\small \VAR{item.role | latex_escape}}\BLOCK{endif}}
-  {\VAR{item.start_date.strftime("%b %Y") if item.start_date else ""}\BLOCK{if item.end_date} -- \VAR{item.end_date.strftime("%b %Y")}\BLOCK{endif}}
+  {\small \BLOCK{if item.repository_url}\href{\VAR{item.repository_url | latex_safe_url}}{GitHub}\BLOCK{endif}\BLOCK{if item.repository_url and item.demo_url} \textperiodcentered\ \BLOCK{endif}\BLOCK{if item.demo_url}\href{\VAR{item.demo_url | latex_safe_url}}{Live}\BLOCK{endif}\normalsize}
 \BLOCK{if item.description}\VAR{item.description | format_description}\BLOCK{endif}
 \BLOCK{if item.skills}\small\textit{\VAR{item.skills | map(attribute="name") | map("latex_escape") | join(", ")}}\normalsize\\
-\BLOCK{endif}
-\BLOCK{if item.repository_url or item.demo_url}
-\small \BLOCK{if item.repository_url}\href{\VAR{item.repository_url | latex_safe_url}}{\VAR{item.repository_url | latex_escape}}\BLOCK{endif}\BLOCK{if item.repository_url and item.demo_url} \textperiodcentered\ \BLOCK{endif}\BLOCK{if item.demo_url}\href{\VAR{item.demo_url | latex_safe_url}}{\VAR{item.demo_url | latex_escape}}\BLOCK{endif}\normalsize\\
 \BLOCK{endif}
 \BLOCK{endfor}
 
