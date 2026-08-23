@@ -48,28 +48,43 @@ class ProfileService:
         self, profile: Profile, first_name: str | None, last_name: str | None
     ) -> int:
         has_basics = bool(first_name and last_name)
-        education_count = await self._count(Education, profile.id)
-        experience_count = await self._count(Experience, profile.id)
-        project_count = await self._count(Project, profile.id)
-        skill_count = await self._count(Skill, profile.id)
+        counts = await self._count_all(profile.id)
 
         checks_passed = sum(
             [
                 has_basics,
-                education_count > 0,
-                experience_count > 0,
-                project_count > 0,
-                skill_count > 0,
+                counts[Education] > 0,
+                counts[Experience] > 0,
+                counts[Project] > 0,
+                counts[Skill] > 0,
             ]
         )
         return round((checks_passed / _COMPLETION_CHECKS) * 100)
 
-    async def _count(
-        self, model: type[Education | Experience | Project | Skill], profile_id: uuid.UUID
-    ) -> int:
-        stmt = (
-            select(func.count())
-            .select_from(model)
-            .where(model.profile_id == profile_id, model.deleted_at.is_(None))
-        )
-        return (await self._db.execute(stmt)).scalar_one()
+    async def _count_all(
+        self, profile_id: uuid.UUID
+    ) -> dict[type[Education | Experience | Project | Skill], int]:
+        """One round trip for all four counts: each is a scalar subquery
+        selected as its own labeled column of a single one-row query,
+        rather than a separate SELECT per model. (A UNION ALL of single-row
+        counts would also be one round trip, but its row order isn't
+        actually guaranteed by the SQL standard -- this avoids relying on
+        that.)"""
+        models: list[type[Education | Experience | Project | Skill]] = [
+            Education,
+            Experience,
+            Project,
+            Skill,
+        ]
+
+        def _count_subquery(model: type[Education | Experience | Project | Skill]) -> Any:
+            return (
+                select(func.count())
+                .select_from(model)
+                .where(model.profile_id == profile_id, model.deleted_at.is_(None))
+                .scalar_subquery()
+            )
+
+        stmt = select(*(_count_subquery(model).label(model.__name__) for model in models))
+        row = (await self._db.execute(stmt)).one()
+        return dict(zip(models, row, strict=True))

@@ -4,6 +4,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.v1.router import api_v1_router
 from app.config.settings import get_settings
+from app.core import audit  # noqa: F401  (registers the audit-log before_flush listener)
 from app.core.logging import configure_logging
 from app.exceptions.handlers import register_exception_handlers
 from app.middleware.request_id import RequestIdMiddleware

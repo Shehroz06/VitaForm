@@ -29,7 +29,7 @@ async def list_experience(
     service: ExperienceServiceDep,
     pagination: Annotated[PaginationParams, Depends(get_pagination)],
 ) -> SuccessResponse[list[ExperienceResponse]]:
-    sort_column, sort_desc = resolve_sort(
+    sort_columns = resolve_sort(
         pagination.sort,
         {
             "start_date": Experience.start_date,
@@ -43,8 +43,7 @@ async def list_experience(
         profile.id,
         page=pagination.page,
         limit=pagination.limit,
-        sort_column=sort_column,
-        sort_desc=sort_desc,
+        sort_columns=sort_columns,
     )
     return SuccessResponse(
         message="Experience retrieved successfully.",

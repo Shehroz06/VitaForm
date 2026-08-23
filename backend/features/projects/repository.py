@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute, selectinload
 
 from app.core.base_crud import BaseRepository
+from app.core.sorting import SortSpec
 from features.projects.models import Project
 from features.skills.models import Skill
 
@@ -28,8 +29,7 @@ class ProjectRepository(BaseRepository[Project]):
         *,
         page: int = 1,
         limit: int = 20,
-        sort_column: InstrumentedAttribute | None = None,
-        sort_desc: bool = False,
+        sort_columns: SortSpec | None = None,
     ) -> tuple[list[Project], int]:
         base_stmt = select(Project).where(
             owner_column == owner_id, Project.deleted_at.is_(None)
@@ -39,8 +39,10 @@ class ProjectRepository(BaseRepository[Project]):
             await self._db.execute(select(func.count()).select_from(base_stmt.subquery()))
         ).scalar_one()
 
-        if sort_column is not None:
-            base_stmt = base_stmt.order_by(sort_column.desc() if sort_desc else sort_column.asc())
+        if sort_columns:
+            base_stmt = base_stmt.order_by(
+                *(column.desc() if desc else column.asc() for column, desc in sort_columns)
+            )
 
         items_stmt = (
             base_stmt.options(selectinload(Project.skills)).offset((page - 1) * limit).limit(limit)

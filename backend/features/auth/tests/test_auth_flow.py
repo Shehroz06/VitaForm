@@ -98,6 +98,20 @@ async def test_login_with_wrong_password_returns_401(
     assert response.status_code == 401
 
 
+async def test_login_with_unregistered_email_returns_401(client: AsyncClient) -> None:
+    """Same status/message as a wrong password (test above) -- covers the
+    functional side of the login timing-oracle fix; the timing property
+    itself isn't asserted here since wall-clock timing is inherently flaky
+    in CI, but this confirms verify_password's dummy-hash path still
+    resolves to the same InvalidCredentialsError outcome."""
+    response = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "no-such-account@example.com", "password": "whatever-password123"},
+    )
+
+    assert response.status_code == 401
+
+
 async def test_refresh_rotates_token_and_invalidates_old_one(
     client: AsyncClient, captured_emails: list[dict[str, str]]
 ) -> None:

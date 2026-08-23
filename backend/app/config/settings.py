@@ -78,6 +78,7 @@ class Settings(BaseSettings):
     storage_local_path: str = "storage/local"
     max_avatar_size_mb: int = 5
     max_attachment_size_mb: int = 10
+    max_cv_import_size_mb: int = 10
 
     s3_bucket: str | None = None
     s3_region: str = "auto"

@@ -55,7 +55,7 @@ async def list_cover_letters(
     service: CoverLetterCrudDep,
     pagination: Annotated[PaginationParams, Depends(get_pagination)],
 ) -> SuccessResponse[list[CoverLetterResponse]]:
-    sort_column, sort_desc = resolve_sort(
+    sort_columns = resolve_sort(
         pagination.sort,
         {
             "created_at": CoverLetter.created_at,
@@ -68,8 +68,7 @@ async def list_cover_letters(
         profile.id,
         page=pagination.page,
         limit=pagination.limit,
-        sort_column=sort_column,
-        sort_desc=sort_desc,
+        sort_columns=sort_columns,
     )
     return SuccessResponse(
         message="Cover letters retrieved successfully.",
@@ -120,7 +119,7 @@ async def list_linkedin_generations(
     service: LinkedinCrudDep,
     pagination: Annotated[PaginationParams, Depends(get_pagination)],
 ) -> SuccessResponse[list[LinkedinGenerationResponse]]:
-    sort_column, sort_desc = resolve_sort(
+    sort_columns = resolve_sort(
         pagination.sort,
         {
             "created_at": LinkedinGeneration.created_at,
@@ -133,8 +132,7 @@ async def list_linkedin_generations(
         profile.id,
         page=pagination.page,
         limit=pagination.limit,
-        sort_column=sort_column,
-        sort_desc=sort_desc,
+        sort_columns=sort_columns,
     )
     return SuccessResponse(
         message="LinkedIn generations retrieved successfully.",

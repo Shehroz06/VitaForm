@@ -29,7 +29,7 @@ async def list_leadership_roles(
     service: LeadershipRoleServiceDep,
     pagination: Annotated[PaginationParams, Depends(get_pagination)],
 ) -> SuccessResponse[list[LeadershipRoleResponse]]:
-    sort_column, sort_desc = resolve_sort(
+    sort_columns = resolve_sort(
         pagination.sort,
         {
             "start_date": LeadershipRole.start_date,
@@ -43,8 +43,7 @@ async def list_leadership_roles(
         profile.id,
         page=pagination.page,
         limit=pagination.limit,
-        sort_column=sort_column,
-        sort_desc=sort_desc,
+        sort_columns=sort_columns,
     )
     return SuccessResponse(
         message="Leadership roles retrieved successfully.",

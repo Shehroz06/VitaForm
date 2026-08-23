@@ -4,14 +4,19 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.sorting import SortSpec
 from app.exceptions.base import ResourceNotFoundException
 from features.education.models import Education
 from features.experience.models import Experience
 from features.jobs.analyzer import analyze_job_description
 from features.jobs.ats_scorer import compute_ats_score
-from features.jobs.models import AtsScore, JobDescription
+from features.jobs.models import AtsScore, Company, JobDescription
 from features.jobs.repository import AtsScoreRepository, CompanyRepository, JobDescriptionRepository
-from features.jobs.schemas import JobAnalysis, JobDescriptionCreateRequest
+from features.jobs.schemas import (
+    JobAnalysis,
+    JobDescriptionCreateRequest,
+    JobDescriptionUpdateRequest,
+)
 from features.profiles.models import Profile
 from features.projects.models import Project
 from features.skills.models import Skill
@@ -66,16 +71,37 @@ class JobService:
         return job
 
     async def list_jobs(
-        self, profile_id: uuid.UUID, *, page: int = 1, limit: int = 20
+        self, profile_id: uuid.UUID, *, page: int = 1, limit: int = 20, sort_columns: SortSpec
     ) -> tuple[list[JobDescription], int]:
         return await self._jobs.list_by_owner(
             JobDescription.profile_id,
             profile_id,
             page=page,
             limit=limit,
-            sort_column=JobDescription.created_at,
-            sort_desc=True,
+            sort_columns=sort_columns,
         )
+
+    async def update_job(
+        self, job_id: uuid.UUID, profile_id: uuid.UUID, data: JobDescriptionUpdateRequest
+    ) -> JobDescription:
+        job = await self.get_owned_job(job_id, profile_id)
+        values = data.model_dump(exclude_unset=True, exclude={"company_name"})
+
+        company: Company | None = job.company
+        if "company_name" in data.model_fields_set:
+            company = None
+            if data.company_name:
+                company = await self._companies.get_or_create_by_name(
+                    profile_id, data.company_name
+                )
+            values["company_id"] = company.id if company else None
+
+        updated = await self._jobs.update(job, **values)
+        # Same reasoning as create_job: set in memory rather than
+        # re-querying, so the router's job.company read right after doesn't
+        # trigger an async lazy-load.
+        updated.company = company
+        return updated
 
     async def delete_job(self, job_id: uuid.UUID, profile_id: uuid.UUID) -> None:
         job = await self.get_owned_job(job_id, profile_id)

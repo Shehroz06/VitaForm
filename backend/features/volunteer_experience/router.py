@@ -29,7 +29,7 @@ async def list_volunteer_experience(
     service: VolunteerExperienceServiceDep,
     pagination: Annotated[PaginationParams, Depends(get_pagination)],
 ) -> SuccessResponse[list[VolunteerExperienceResponse]]:
-    sort_column, sort_desc = resolve_sort(
+    sort_columns = resolve_sort(
         pagination.sort,
         {
             "start_date": VolunteerExperience.start_date,
@@ -43,8 +43,7 @@ async def list_volunteer_experience(
         profile.id,
         page=pagination.page,
         limit=pagination.limit,
-        sort_column=sort_column,
-        sort_desc=sort_desc,
+        sort_columns=sort_columns,
     )
     return SuccessResponse(
         message="Volunteer experience retrieved successfully.",

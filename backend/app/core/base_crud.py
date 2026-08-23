@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
+from app.core.sorting import SortSpec
 from app.database.base import CrudModelMixin
 from app.exceptions.base import ResourceNotFoundException
 
@@ -32,8 +33,7 @@ class BaseRepository[ModelT: CrudModelMixin]:
         *,
         page: int = 1,
         limit: int = 20,
-        sort_column: InstrumentedAttribute[Any] | None = None,
-        sort_desc: bool = False,
+        sort_columns: SortSpec | None = None,
     ) -> tuple[list[ModelT], int]:
         base_stmt = select(self._model).where(
             owner_column == owner_id, self._model.deleted_at.is_(None)
@@ -43,8 +43,10 @@ class BaseRepository[ModelT: CrudModelMixin]:
             await self._db.execute(select(func.count()).select_from(base_stmt.subquery()))
         ).scalar_one()
 
-        if sort_column is not None:
-            base_stmt = base_stmt.order_by(sort_column.desc() if sort_desc else sort_column.asc())
+        if sort_columns:
+            base_stmt = base_stmt.order_by(
+                *(column.desc() if desc else column.asc() for column, desc in sort_columns)
+            )
 
         items_stmt = base_stmt.offset((page - 1) * limit).limit(limit)
         items = list((await self._db.execute(items_stmt)).scalars().all())
@@ -95,16 +97,14 @@ class BaseOwnedCrudService[ModelT: CrudModelMixin]:
         *,
         page: int = 1,
         limit: int = 20,
-        sort_column: InstrumentedAttribute[Any] | None = None,
-        sort_desc: bool = False,
+        sort_columns: SortSpec | None = None,
     ) -> tuple[list[ModelT], int]:
         return await self._repository.list_by_owner(
             self._owner_column,
             owner_id,
             page=page,
             limit=limit,
-            sort_column=sort_column,
-            sort_desc=sort_desc,
+            sort_columns=sort_columns,
         )
 
     async def create_owned(self, owner_id: uuid.UUID, **values: Any) -> ModelT:

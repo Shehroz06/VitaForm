@@ -4,12 +4,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, UploadFile, status
 from fastapi import File as FileParam
 
+from app.config.settings import Settings, get_settings
+from app.core.sorting import resolve_sort
 from app.core.uploads import read_upload_capped
 from app.dependencies.rate_limits import cv_import_rate_limit
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
 from app.schemas.response import SuccessResponse
 from features.cv_import.dependencies import get_import_service
-from features.cv_import.extraction import MAX_PDF_SIZE_MB
+from features.cv_import.models import ImportSession
 from features.cv_import.schemas import (
     ImportConfirmRequest,
     ImportConfirmResultResponse,
@@ -32,12 +34,14 @@ ImportServiceDep = Annotated[ImportService, Depends(get_import_service)]
 async def create_import_session(
     profile: CurrentProfile,
     service: ImportServiceDep,
+    settings: Annotated[Settings, Depends(get_settings)],
     file: Annotated[UploadFile, FileParam()],
 ) -> SuccessResponse[ImportSessionResponse]:
+    max_size_mb = settings.max_cv_import_size_mb
     content = await read_upload_capped(
         file,
-        MAX_PDF_SIZE_MB * 1024 * 1024,
-        f"PDF exceeds the {MAX_PDF_SIZE_MB}MB import limit.",
+        max_size_mb * 1024 * 1024,
+        f"PDF exceeds the {max_size_mb}MB import limit.",
     )
     session = await service.create_session(profile, file.filename, content)
     return SuccessResponse(
@@ -52,8 +56,18 @@ async def list_import_sessions(
     service: ImportServiceDep,
     pagination: Annotated[PaginationParams, Depends(get_pagination)],
 ) -> SuccessResponse[list[ImportSessionResponse]]:
+    sort_columns = resolve_sort(
+        pagination.sort,
+        {
+            "status": ImportSession.status,
+            "created_at": ImportSession.created_at,
+            "updated_at": ImportSession.updated_at,
+        },
+        default=ImportSession.created_at,
+        default_desc=True,
+    )
     items, total = await service.list_sessions(
-        profile.id, page=pagination.page, limit=pagination.limit
+        profile.id, page=pagination.page, limit=pagination.limit, sort_columns=sort_columns
     )
     return SuccessResponse(
         message="Import sessions retrieved successfully.",

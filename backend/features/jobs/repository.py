@@ -1,11 +1,11 @@
 import uuid
-from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute, selectinload
 
 from app.core.base_crud import BaseRepository
+from app.core.sorting import SortSpec
 from features.jobs.models import AtsScore, Company, JobDescription
 
 
@@ -56,8 +56,7 @@ class JobDescriptionRepository(BaseRepository[JobDescription]):
         *,
         page: int = 1,
         limit: int = 20,
-        sort_column: InstrumentedAttribute[Any] | None = None,
-        sort_desc: bool = False,
+        sort_columns: SortSpec | None = None,
     ) -> tuple[list[JobDescription], int]:
         base_stmt = select(JobDescription).where(
             owner_column == owner_id, JobDescription.deleted_at.is_(None)
@@ -67,8 +66,10 @@ class JobDescriptionRepository(BaseRepository[JobDescription]):
             await self._db.execute(select(func.count()).select_from(base_stmt.subquery()))
         ).scalar_one()
 
-        if sort_column is not None:
-            base_stmt = base_stmt.order_by(sort_column.desc() if sort_desc else sort_column.asc())
+        if sort_columns:
+            base_stmt = base_stmt.order_by(
+                *(column.desc() if desc else column.asc() for column, desc in sort_columns)
+            )
 
         items_stmt = (
             base_stmt.options(selectinload(JobDescription.company))

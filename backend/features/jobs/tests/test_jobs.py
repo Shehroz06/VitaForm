@@ -204,3 +204,107 @@ async def test_ats_score_flags_missing_skills_for_unrelated_profile(
     assert data["overall_score"] < 50
     assert "Python" in data["missing_skills"]
     assert len(data["recommendations"]) > 0
+
+
+async def test_update_job_corrects_metadata_without_touching_analysis(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "jobs8@example.com")
+    create_response = await client.post(
+        "/api/v1/jobs",
+        headers=headers,
+        json={"title": "Backend Engineer", "raw_text": _JD_TEXT, "location": "Remote"},
+    )
+    job_id = create_response.json()["data"]["id"]
+    original_keywords = create_response.json()["data"]["keywords"]
+
+    response = await client.patch(
+        f"/api/v1/jobs/{job_id}",
+        headers=headers,
+        json={"title": "Senior Backend Engineer", "location": "Berlin"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["title"] == "Senior Backend Engineer"
+    assert data["location"] == "Berlin"
+    assert data["raw_text"] == _JD_TEXT
+    assert data["keywords"] == original_keywords
+
+
+async def test_update_job_sets_and_clears_company(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "jobs9@example.com")
+    create_response = await client.post(
+        "/api/v1/jobs", headers=headers, json={"title": "Backend Engineer", "raw_text": _JD_TEXT}
+    )
+    job_id = create_response.json()["data"]["id"]
+    assert create_response.json()["data"]["company_name"] is None
+
+    set_response = await client.patch(
+        f"/api/v1/jobs/{job_id}", headers=headers, json={"company_name": "Globex"}
+    )
+    assert set_response.json()["data"]["company_name"] == "Globex"
+
+    clear_response = await client.patch(
+        f"/api/v1/jobs/{job_id}", headers=headers, json={"company_name": None}
+    )
+    assert clear_response.json()["data"]["company_name"] is None
+    assert clear_response.json()["data"]["company_id"] is None
+
+
+async def test_update_job_with_unknown_id_returns_404(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "jobs10@example.com")
+
+    response = await client.patch(
+        "/api/v1/jobs/00000000-0000-0000-0000-000000000000",
+        headers=headers,
+        json={"title": "New Title"},
+    )
+    assert response.status_code == 404
+
+
+async def test_users_cannot_update_each_others_jobs(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers_a = await _auth(client, captured_emails, "jobsIsoA@example.com")
+    headers_b = await _auth(client, captured_emails, "jobsIsoB@example.com")
+    create_response = await client.post(
+        "/api/v1/jobs", headers=headers_a, json={"title": "Backend Engineer", "raw_text": _JD_TEXT}
+    )
+    job_id = create_response.json()["data"]["id"]
+
+    response = await client.patch(
+        f"/api/v1/jobs/{job_id}", headers=headers_b, json={"title": "Hijacked"}
+    )
+    assert response.status_code == 404
+
+
+async def test_list_jobs_supports_sort_query_param(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "jobsSort@example.com")
+    await client.post(
+        "/api/v1/jobs", headers=headers, json={"title": "Alpha Role", "raw_text": _JD_TEXT}
+    )
+    await client.post(
+        "/api/v1/jobs",
+        headers=headers,
+        json={"title": "Beta Role", "raw_text": _JD_TEXT + "\nExtra line to change the hash."},
+    )
+
+    response = await client.get("/api/v1/jobs?sort=title", headers=headers)
+    titles = [item["title"] for item in response.json()["data"]]
+    assert titles == ["Alpha Role", "Beta Role"]
+
+
+async def test_list_jobs_rejects_invalid_sort_field(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "jobsSortBad@example.com")
+
+    response = await client.get("/api/v1/jobs?sort=not_a_field", headers=headers)
+    assert response.status_code == 422

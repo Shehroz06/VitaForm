@@ -27,7 +27,7 @@ async def list_education(
     service: EducationServiceDep,
     pagination: Annotated[PaginationParams, Depends(get_pagination)],
 ) -> SuccessResponse[list[EducationResponse]]:
-    sort_column, sort_desc = resolve_sort(
+    sort_columns = resolve_sort(
         pagination.sort,
         {
             "start_date": Education.start_date,
@@ -41,8 +41,7 @@ async def list_education(
         profile.id,
         page=pagination.page,
         limit=pagination.limit,
-        sort_column=sort_column,
-        sort_desc=sort_desc,
+        sort_columns=sort_columns,
     )
     return SuccessResponse(
         message="Education retrieved successfully.",

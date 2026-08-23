@@ -36,7 +36,7 @@ class AuthRepository:
         result = await self._db.execute(
             select(User)
             .where(User.email == _normalize_email(email), User.deleted_at.is_(None))
-            .options(selectinload(User.roles))
+            .options(selectinload(User.roles).selectinload(Role.permissions))
         )
         return result.scalar_one_or_none()
 
@@ -44,7 +44,7 @@ class AuthRepository:
         result = await self._db.execute(
             select(User)
             .where(User.id == user_id, User.deleted_at.is_(None))
-            .options(selectinload(User.roles))
+            .options(selectinload(User.roles).selectinload(Role.permissions))
         )
         return result.scalar_one_or_none()
 

@@ -32,6 +32,13 @@ from features.auth.service import AuthService
 
 settings = get_settings()
 
+# A precomputed hash of a value nobody will ever type, verified against on
+# login when the email doesn't match a real account -- so that path still
+# pays Argon2's cost instead of returning near-instantly, which would
+# otherwise let a timing difference reveal whether an email is registered
+# (forgot-password already gets this right; login previously didn't).
+_DUMMY_PASSWORD_HASH = hash_password("no-such-account-timing-safety-padding")
+
 # Every self-registered user starts as a "student" -- the role constants'
 # own description names it as the default (see DEFAULT_ROLES). Recruiter,
 # researcher, moderator, and admin are all granted out-of-band, never
@@ -96,7 +103,9 @@ class LoginUser:
         self, data: LoginRequest, context: RequestContext
     ) -> tuple[User, IssuedTokenPair]:
         user = await self._repository.get_user_by_email(data.email)
-        if user is None or not verify_password(data.password, user.password_hash):
+        password_hash = user.password_hash if user is not None else _DUMMY_PASSWORD_HASH
+        password_is_valid = verify_password(data.password, password_hash)
+        if user is None or not password_is_valid:
             raise InvalidCredentialsError
 
         if not user.is_active:

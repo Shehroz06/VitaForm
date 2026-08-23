@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config.settings import Settings
 from app.core.base_crud import BaseOwnedCrudService, BaseRepository
 from app.core.enums import GenerationStatus, ImportSessionStatus, SectionType
+from app.core.sorting import SortSpec
 from app.exceptions.base import (
     BusinessRuleException,
     ResourceNotFoundException,
@@ -71,7 +72,7 @@ class ImportService:
     async def create_session(
         self, profile: Profile, filename: str | None, content: bytes
     ) -> ImportSession:
-        validate_pdf_upload(filename, content)
+        validate_pdf_upload(filename, content, self._settings.max_cv_import_size_mb)
         assert filename is not None  # validated above
 
         outcome = await classify_pdf(self._settings, content)
@@ -116,11 +117,14 @@ class ImportService:
         return session
 
     async def list_sessions(
-        self, profile_id: Any, *, page: int, limit: int
+        self, profile_id: Any, *, page: int, limit: int, sort_columns: SortSpec
     ) -> tuple[list[ImportSession], int]:
         return await self._repository.list_by_owner(
-            ImportSession.profile_id, profile_id, page=page, limit=limit,
-            sort_column=ImportSession.created_at, sort_desc=True,
+            ImportSession.profile_id,
+            profile_id,
+            page=page,
+            limit=limit,
+            sort_columns=sort_columns,
         )
 
     async def confirm(

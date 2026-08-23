@@ -254,3 +254,65 @@ async def test_users_cannot_access_each_others_import_sessions(
 
     response = await client.get(f"/api/v1/cv-import/sessions/{session_id}", headers=headers_b)
     assert response.status_code == 404
+
+
+async def test_list_import_sessions_supports_sort_query_param(
+    client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch
+) -> None:
+    headers = await _auth(client, captured_emails, "cvimportSort@example.com")
+    fake = FakeClassifierProvider("gemini")
+    _patch_provider(monkeypatch, fake)
+
+    for _ in range(2):
+        await client.post(
+            "/api/v1/cv-import/sessions",
+            headers=headers,
+            files={"file": ("resume.pdf", build_sample_pdf(), "application/pdf")},
+        )
+
+    asc_response = await client.get("/api/v1/cv-import/sessions?sort=created_at", headers=headers)
+    assert asc_response.status_code == 200
+    ids_asc = [item["id"] for item in asc_response.json()["data"]]
+
+    desc_response = await client.get(
+        "/api/v1/cv-import/sessions?sort=-created_at", headers=headers
+    )
+    ids_desc = [item["id"] for item in desc_response.json()["data"]]
+    assert ids_asc == list(reversed(ids_desc))
+
+
+async def test_list_import_sessions_supports_multi_field_sort(
+    client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch
+) -> None:
+    """Every session created here is "pending" (no reject/confirm yet), so
+    `?sort=status,-created_at` exercises the comma-separated multi-key
+    syntax for real: the primary key (status) ties for all of them, so the
+    result order is entirely down to the secondary key breaking that tie."""
+    headers = await _auth(client, captured_emails, "cvimportMultiSort@example.com")
+    fake = FakeClassifierProvider("gemini")
+    _patch_provider(monkeypatch, fake)
+
+    for _ in range(3):
+        await client.post(
+            "/api/v1/cv-import/sessions",
+            headers=headers,
+            files={"file": ("resume.pdf", build_sample_pdf(), "application/pdf")},
+        )
+
+    response = await client.get(
+        "/api/v1/cv-import/sessions?sort=status,-created_at", headers=headers
+    )
+    assert response.status_code == 200
+    items = response.json()["data"]
+    assert all(item["status"] == "pending" for item in items)
+    created_ats = [item["created_at"] for item in items]
+    assert created_ats == sorted(created_ats, reverse=True)
+
+
+async def test_list_import_sessions_rejects_invalid_sort_field(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "cvimportSortBad@example.com")
+
+    response = await client.get("/api/v1/cv-import/sessions?sort=not_a_field", headers=headers)
+    assert response.status_code == 422

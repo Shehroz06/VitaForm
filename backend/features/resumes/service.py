@@ -4,6 +4,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.sorting import SortSpec
 from app.exceptions.base import ResourceNotFoundException, ValidationException
 from features.resumes.models import Resume, ResumeVersion
 from features.resumes.repository import (
@@ -59,15 +60,14 @@ class ResumeService:
         return resume
 
     async def list_resumes(
-        self, profile_id: uuid.UUID, *, page: int = 1, limit: int = 20
+        self, profile_id: uuid.UUID, *, page: int = 1, limit: int = 20, sort_columns: SortSpec
     ) -> tuple[list[Resume], int]:
         return await self._resumes.list_by_owner(
             Resume.profile_id,
             profile_id,
             page=page,
             limit=limit,
-            sort_column=Resume.updated_at,
-            sort_desc=True,
+            sort_columns=sort_columns,
         )
 
     async def update_resume(

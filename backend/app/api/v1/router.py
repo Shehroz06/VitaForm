@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1 import health
 from features.achievements.router import router as achievements_router
+from features.audit_log.router import router as audit_log_router
 from features.auth.router import router as auth_router
 from features.awards.router import router as awards_router
 from features.certifications.router import router as certifications_router
@@ -12,11 +13,13 @@ from features.education.router import router as education_router
 from features.experience.router import router as experience_router
 from features.files.router import router as files_router
 from features.hackathons.router import router as hackathons_router
+from features.interests.router import router as interests_router
 from features.jobs.router import router as jobs_router
 from features.languages.router import router as languages_router
 from features.leadership_roles.router import router as leadership_roles_router
 from features.organizations.router import router as organizations_router
 from features.patents.router import router as patents_router
+from features.portfolio.router import router as portfolio_router
 from features.profiles.router import router as profiles_router
 from features.projects.router import router as projects_router
 from features.references.router import router as references_router
@@ -50,3 +53,6 @@ api_v1_router.include_router(patents_router)
 api_v1_router.include_router(jobs_router)
 api_v1_router.include_router(companion_router)
 api_v1_router.include_router(cv_import_router)
+api_v1_router.include_router(audit_log_router)
+api_v1_router.include_router(interests_router)
+api_v1_router.include_router(portfolio_router)

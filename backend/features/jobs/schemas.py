@@ -24,6 +24,19 @@ class JobDescriptionCreateRequest(BaseModel):
     employment_type: EmploymentType | None = None
 
 
+class JobDescriptionUpdateRequest(BaseModel):
+    """Corrects metadata on an already-saved posting -- title, company,
+    location, employment type. Deliberately excludes raw_text: that's what
+    keywords/required_skills/preferred_skills were analyzed from, and
+    create_job already treats identical raw_text as the same posting, so a
+    genuinely different JD body is a new posting, not an edit to this one."""
+
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    company_name: str | None = Field(default=None, max_length=200)
+    location: str | None = Field(default=None, max_length=150)
+    employment_type: EmploymentType | None = None
+
+
 class CompanyResponse(BaseModel):
     id: uuid.UUID
     name: str

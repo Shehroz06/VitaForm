@@ -34,7 +34,7 @@ async def list_achievements(
     service: AchievementServiceDep,
     pagination: Annotated[PaginationParams, Depends(get_pagination)],
 ) -> SuccessResponse[list[AchievementResponse]]:
-    sort_column, sort_desc = resolve_sort(
+    sort_columns = resolve_sort(
         pagination.sort,
         {
             "date_achieved": Achievement.date_achieved,
@@ -48,8 +48,7 @@ async def list_achievements(
         profile.id,
         page=pagination.page,
         limit=pagination.limit,
-        sort_column=sort_column,
-        sort_desc=sort_desc,
+        sort_columns=sort_columns,
     )
     return SuccessResponse(
         message="Achievements retrieved successfully.",

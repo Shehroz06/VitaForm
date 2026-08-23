@@ -1100,3 +1100,33 @@ async def test_delete_resume(client: AsyncClient, captured_emails: list[dict[str
 
     get_response = await client.get(f"/api/v1/resumes/{resume_id}", headers=headers)
     assert get_response.status_code == 404
+
+
+async def test_list_resumes_supports_sort_query_param(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "resumeSortList@example.com")
+    template_id = await _classic_template_id(client)
+    await client.post(
+        "/api/v1/resumes",
+        headers=headers,
+        json={"title": "Alpha Resume", "template_id": template_id},
+    )
+    await client.post(
+        "/api/v1/resumes",
+        headers=headers,
+        json={"title": "Beta Resume", "template_id": template_id},
+    )
+
+    response = await client.get("/api/v1/resumes?sort=title", headers=headers)
+    titles = [item["title"] for item in response.json()["data"]]
+    assert titles == ["Alpha Resume", "Beta Resume"]
+
+
+async def test_list_resumes_rejects_invalid_sort_field(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "resumeSortListBad@example.com")
+
+    response = await client.get("/api/v1/resumes?sort=not_a_field", headers=headers)
+    assert response.status_code == 422

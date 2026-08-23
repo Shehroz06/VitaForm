@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.core.http import content_disposition
+from app.core.sorting import resolve_sort
 from app.dependencies.auth import CurrentUser
 from app.dependencies.rate_limits import (
     resume_autofit_rate_limit,
@@ -113,8 +114,18 @@ async def list_resumes(
     service: ResumeServiceDep,
     pagination: Annotated[PaginationParams, Depends(get_pagination)],
 ) -> SuccessResponse[list[ResumeResponse]]:
+    sort_columns = resolve_sort(
+        pagination.sort,
+        {
+            "title": Resume.title,
+            "created_at": Resume.created_at,
+            "updated_at": Resume.updated_at,
+        },
+        default=Resume.updated_at,
+        default_desc=True,
+    )
     items, total = await service.list_resumes(
-        profile.id, page=pagination.page, limit=pagination.limit
+        profile.id, page=pagination.page, limit=pagination.limit, sort_columns=sort_columns
     )
     latest_by_resume = await service.get_latest_versions_by_resume([item.id for item in items])
     responses: list[ResumeResponse] = []

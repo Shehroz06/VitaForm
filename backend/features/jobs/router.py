@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
+from app.core.sorting import resolve_sort
 from app.exceptions.base import ResourceNotFoundException
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
 from app.schemas.response import SuccessResponse
@@ -15,6 +16,7 @@ from features.jobs.schemas import (
     JobAnalysis,
     JobDescriptionCreateRequest,
     JobDescriptionResponse,
+    JobDescriptionUpdateRequest,
 )
 from features.jobs.service import AtsScoringService, JobService
 from features.profiles.dependencies import CurrentProfile
@@ -56,8 +58,18 @@ async def list_jobs(
     service: JobServiceDep,
     pagination: Annotated[PaginationParams, Depends(get_pagination)],
 ) -> SuccessResponse[list[JobDescriptionResponse]]:
+    sort_columns = resolve_sort(
+        pagination.sort,
+        {
+            "title": JobDescription.title,
+            "created_at": JobDescription.created_at,
+            "updated_at": JobDescription.updated_at,
+        },
+        default=JobDescription.created_at,
+        default_desc=True,
+    )
     items, total = await service.list_jobs(
-        profile.id, page=pagination.page, limit=pagination.limit
+        profile.id, page=pagination.page, limit=pagination.limit, sort_columns=sort_columns
     )
     return SuccessResponse(
         message="Job descriptions retrieved successfully.",
@@ -88,6 +100,20 @@ async def get_job(
     job = await service.get_owned_job(job_id, profile.id)
     return SuccessResponse(
         message="Job description retrieved successfully.",
+        data=_to_job_response(job),
+    )
+
+
+@router.patch("/jobs/{job_id}", response_model=SuccessResponse[JobDescriptionResponse])
+async def update_job(
+    job_id: uuid.UUID,
+    data: JobDescriptionUpdateRequest,
+    profile: CurrentProfile,
+    service: JobServiceDep,
+) -> SuccessResponse[JobDescriptionResponse]:
+    job = await service.update_job(job_id, profile.id, data)
+    return SuccessResponse(
+        message="Job description updated successfully.",
         data=_to_job_response(job),
     )
 

@@ -27,7 +27,7 @@ async def list_hackathons(
     service: HackathonServiceDep,
     pagination: Annotated[PaginationParams, Depends(get_pagination)],
 ) -> SuccessResponse[list[HackathonResponse]]:
-    sort_column, sort_desc = resolve_sort(
+    sort_columns = resolve_sort(
         pagination.sort,
         {
             "event_date": Hackathon.event_date,
@@ -41,8 +41,7 @@ async def list_hackathons(
         profile.id,
         page=pagination.page,
         limit=pagination.limit,
-        sort_column=sort_column,
-        sort_desc=sort_desc,
+        sort_columns=sort_columns,
     )
     return SuccessResponse(
         message="Hackathons retrieved successfully.",
