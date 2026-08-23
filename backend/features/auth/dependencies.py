@@ -9,6 +9,7 @@ from features.auth.repository import AuthRepository
 from features.auth.service import AuthService
 from features.auth.use_cases import (
     AdminResetPassword,
+    DeleteAccount,
     LoginUser,
     LogoutUser,
     RefreshAccessToken,
@@ -78,3 +79,9 @@ def get_admin_reset_password_use_case(
     repository: Annotated[AuthRepository, Depends(get_auth_repository)],
 ) -> AdminResetPassword:
     return AdminResetPassword(repository)
+
+
+def get_delete_account_use_case(
+    repository: Annotated[AuthRepository, Depends(get_auth_repository)],
+) -> DeleteAccount:
+    return DeleteAccount(repository)

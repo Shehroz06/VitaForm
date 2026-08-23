@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
@@ -29,7 +29,7 @@ class ResumeSection(BaseModel):
     section_type: SectionType
     custom_title: str | None = Field(default=None, max_length=100)
     visible: bool = True
-    item_ids: list[uuid.UUID] = Field(default_factory=list)
+    item_ids: list[uuid.UUID] = Field(default_factory=list, max_length=200)
 
 
 class ResumeStyle(BaseModel):
@@ -54,10 +54,13 @@ class ResumeStyle(BaseModel):
     content_density: float = Field(default=1.0, ge=0.8, le=1.0)
 
 
+_OverrideText = Annotated[str, Field(max_length=2000)]
+
+
 class ResumeContent(BaseModel):
     summary: str | None = Field(default=None, max_length=2000)
     contact_visibility: ContactVisibility = Field(default_factory=ContactVisibility)
-    sections: list[ResumeSection] = Field(default_factory=list)
+    sections: list[ResumeSection] = Field(default_factory=list, max_length=50)
     style: ResumeStyle = Field(default_factory=ResumeStyle)
     # Per-item description text, scoped to this resume only -- never
     # written back to the source table (Experience.description etc.), so
@@ -67,15 +70,17 @@ class ResumeContent(BaseModel):
     # already present in the item's real description -- it cannot
     # introduce text that doesn't already exist somewhere in the source.
     # Keyed by item id (as a string -- JSON object keys can't be UUIDs).
-    description_overrides: dict[str, str] = Field(default_factory=dict)
+    # Bounded on both axes (key count, value length) so this JSONB column
+    # can't be inflated into an arbitrarily expensive render.
+    description_overrides: dict[str, _OverrideText] = Field(default_factory=dict, max_length=200)
     # Same resume-scoped-only guarantee as description_overrides, for an
     # item's own title/role and its organization/institution line -- e.g.
     # rephrasing "Software Engineering Intern" without touching the real
     # Experience row. Only meaningful for section types with a sub-heading
     # (see section_registry.py's TITLE_FIELDS/SUBTITLE_FIELDS); silently
     # ignored at render time for section types without one.
-    title_overrides: dict[str, str] = Field(default_factory=dict)
-    subtitle_overrides: dict[str, str] = Field(default_factory=dict)
+    title_overrides: dict[str, _OverrideText] = Field(default_factory=dict, max_length=200)
+    subtitle_overrides: dict[str, _OverrideText] = Field(default_factory=dict, max_length=200)
 
 
 class TemplateSampleRequest(BaseModel):

@@ -35,16 +35,22 @@ class AuthRepository:
     async def get_user_by_email(self, email: str) -> User | None:
         result = await self._db.execute(
             select(User)
-            .where(User.email == _normalize_email(email))
+            .where(User.email == _normalize_email(email), User.deleted_at.is_(None))
             .options(selectinload(User.roles))
         )
         return result.scalar_one_or_none()
 
     async def get_user_by_id(self, user_id: uuid.UUID) -> User | None:
         result = await self._db.execute(
-            select(User).where(User.id == user_id).options(selectinload(User.roles))
+            select(User)
+            .where(User.id == user_id, User.deleted_at.is_(None))
+            .options(selectinload(User.roles))
         )
         return result.scalar_one_or_none()
+
+    async def soft_delete_user(self, user: User) -> None:
+        user.deleted_at = datetime.now(UTC)
+        await self._db.flush()
 
     async def get_role_by_name(self, name: str) -> Role | None:
         result = await self._db.execute(select(Role).where(Role.name == name))
@@ -112,6 +118,16 @@ class AuthRepository:
         session.revoked_at = datetime.now(UTC)
         await self._db.flush()
 
+    async def revoke_session_immediately(self, session: Session) -> None:
+        """Same effect as revoke_session, but commits right away instead of
+        relying on the request's normal end-of-request commit. Needed
+        specifically when the caller revokes as a side effect of then
+        raising an exception -- get_db's `except Exception: rollback()`
+        would otherwise silently undo the revocation along with everything
+        else in the request."""
+        session.revoked_at = datetime.now(UTC)
+        await self._db.commit()
+
     async def revoke_all_sessions_for_user(self, user_id: uuid.UUID) -> None:
         result = await self._db.execute(
             select(Session).where(Session.user_id == user_id, Session.revoked_at.is_(None))
@@ -133,6 +149,16 @@ class AuthRepository:
         self._db.add(token)
         await self._db.flush()
         return token
+
+    async def get_refresh_token_by_hash(self, token_hash: str) -> RefreshToken | None:
+        """Unfiltered lookup -- unlike get_valid_refresh_token, this returns
+        an already-revoked token too, so the caller can distinguish "reused
+        a revoked token" (a real security signal) from "token never
+        existed" or "expired"."""
+        result = await self._db.execute(
+            select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+        )
+        return result.scalar_one_or_none()
 
     async def get_valid_refresh_token(self, token_hash: str) -> RefreshToken | None:
         result = await self._db.execute(

@@ -10,7 +10,6 @@ dependencies = [
     "psycopg[binary]>=3.3.4",
     "pydantic[email]>=2",
     "pydantic-settings>=2.14.2",
-    "python-jose[cryptography]>=3.5.0",
     "python-multipart>=0.0.32",
     "redis>=8.1.0",
     "sqlalchemy>=2.0",
@@ -23,6 +22,7 @@ dependencies = [
     "tiktoken>=0.13.0",
     "aiosmtplib>=5.1.2",
     "pymupdf>=1.28.2",
+    "pyjwt>=2.13.0",
 ]
 
 [tool.uv]
@@ -55,5 +55,4 @@ dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "ruff>=0.16.1",
-    "types-python-jose>=3.5.0.20260408",
 ]

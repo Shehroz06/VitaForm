@@ -15,6 +15,7 @@ from app.exceptions.base import AuthenticationException
 from app.schemas.response import MessageResponse, SuccessResponse
 from features.auth.dependencies import (
     get_admin_reset_password_use_case,
+    get_delete_account_use_case,
     get_login_use_case,
     get_logout_use_case,
     get_refresh_use_case,
@@ -28,6 +29,7 @@ from features.auth.repository import AuthRepository
 from features.auth.schemas import (
     AccessTokenResponse,
     AdminResetPasswordRequest,
+    DeleteAccountRequest,
     ForgotPasswordRequest,
     IssuedTokenPair,
     LoginRequest,
@@ -39,6 +41,7 @@ from features.auth.schemas import (
 )
 from features.auth.use_cases import (
     AdminResetPassword,
+    DeleteAccount,
     LoginUser,
     LogoutUser,
     RefreshAccessToken,
@@ -221,6 +224,20 @@ async def update_me(
     repository = AuthRepository(db)
     await repository.update_user_name(user, data.first_name, data.last_name)
     return SuccessResponse(message="Profile updated successfully.", data=_to_user_response(user))
+
+
+@router.delete("/me", response_model=SuccessResponse[MessageResponse])
+async def delete_account(
+    data: DeleteAccountRequest,
+    user: CurrentUser,
+    response: Response,
+    use_case: Annotated[DeleteAccount, Depends(get_delete_account_use_case)],
+) -> SuccessResponse[MessageResponse]:
+    await use_case.execute(user, data)
+    _clear_refresh_cookie(response)
+    return SuccessResponse(
+        message="Account deleted.", data=MessageResponse(message="Account deleted.")
+    )
 
 
 @router.get("/admin-check", response_model=SuccessResponse[MessageResponse])

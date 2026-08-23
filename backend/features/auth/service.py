@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 
 from app.config.settings import get_settings
 from app.core.security import (
@@ -39,8 +40,22 @@ class AuthService:
 
     async def rotate_refresh_token(self, raw_refresh_token: str) -> IssuedTokenPair:
         token_hash = hash_opaque_token(raw_refresh_token)
-        existing_token = await self._repository.get_valid_refresh_token(token_hash)
+        existing_token = await self._repository.get_refresh_token_by_hash(token_hash)
         if existing_token is None:
+            raise InvalidOrExpiredTokenError("Refresh token is invalid or has expired.")
+
+        if existing_token.revoked_at is not None:
+            # Reuse of a token that was already rotated away -- the likely
+            # explanation is a stolen refresh token racing the legitimate
+            # client, so kill the whole session rather than just rejecting
+            # this one request (standard OAuth refresh-token-reuse
+            # response), invalidating the legitimate rotated token too.
+            stolen_session = await self._repository.get_active_session(existing_token.session_id)
+            if stolen_session is not None:
+                await self._repository.revoke_session_immediately(stolen_session)
+            raise InvalidOrExpiredTokenError("Refresh token is invalid or has expired.")
+
+        if existing_token.expires_at < datetime.now(UTC):
             raise InvalidOrExpiredTokenError("Refresh token is invalid or has expired.")
 
         session = await self._repository.get_active_session(existing_token.session_id)

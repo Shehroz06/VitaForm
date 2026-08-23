@@ -20,6 +20,7 @@ from features.auth.models import User
 from features.auth.repository import AuthRepository
 from features.auth.schemas import (
     AdminResetPasswordRequest,
+    DeleteAccountRequest,
     ForgotPasswordRequest,
     IssuedTokenPair,
     LoginRequest,
@@ -30,6 +31,12 @@ from features.auth.schemas import (
 from features.auth.service import AuthService
 
 settings = get_settings()
+
+# Every self-registered user starts as a "student" -- the role constants'
+# own description names it as the default (see DEFAULT_ROLES). Recruiter,
+# researcher, moderator, and admin are all granted out-of-band, never
+# self-selected at signup.
+_DEFAULT_REGISTRATION_ROLE = "student"
 
 
 class RequestContext:
@@ -55,12 +62,13 @@ class RegisterUser:
         if existing is not None:
             raise UserAlreadyExistsError
 
+        default_role = await self._repository.get_role_by_name(_DEFAULT_REGISTRATION_ROLE)
         user = await self._repository.create_user(
             email=data.email,
             password_hash=hash_password(data.password),
             first_name=data.first_name,
             last_name=data.last_name,
-            roles=[],
+            roles=[default_role] if default_role is not None else [],
         )
 
         raw_token = generate_opaque_token()
@@ -212,3 +220,20 @@ class AdminResetPassword:
         await self._repository.update_user_password(user, hash_password(data.new_password))
         await self._repository.revoke_all_sessions_for_user(user.id)
         return user
+
+
+class DeleteAccount:
+    """Soft-deletes the calling user's own account. Password-confirmed --
+    a bearer token alone shouldn't be enough to trigger something this
+    destructive -- and revokes every session so no outstanding access or
+    refresh token keeps working past this point."""
+
+    def __init__(self, repository: AuthRepository) -> None:
+        self._repository = repository
+
+    async def execute(self, user: User, data: DeleteAccountRequest) -> None:
+        if not verify_password(data.password, user.password_hash):
+            raise InvalidCredentialsError
+
+        await self._repository.soft_delete_user(user)
+        await self._repository.revoke_all_sessions_for_user(user.id)

@@ -5,9 +5,9 @@ from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import Any
 
+import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
-from jose import ExpiredSignatureError, JWTError, jwt
 
 from app.config.settings import get_settings
 
@@ -51,9 +51,9 @@ def create_access_token(user_id: uuid.UUID, roles: list[str]) -> str:
 def decode_access_token(token: str) -> dict[str, Any]:
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
-    except ExpiredSignatureError as exc:
+    except jwt.ExpiredSignatureError as exc:
         raise InvalidTokenError("Access token has expired.") from exc
-    except JWTError as exc:
+    except jwt.PyJWTError as exc:
         raise InvalidTokenError("Access token is invalid.") from exc
 
     if payload.get("type") != TokenType.ACCESS:

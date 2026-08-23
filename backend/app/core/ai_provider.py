@@ -57,10 +57,10 @@ class AIProvider(Protocol):
 
 
 class AnthropicProvider:
-    def __init__(self, api_key: str | None, model: str) -> None:
+    def __init__(self, api_key: str | None, model: str, timeout_seconds: float) -> None:
         self.name = "anthropic"
         self.model = model
-        self._client = AsyncAnthropic(api_key=api_key)
+        self._client = AsyncAnthropic(api_key=api_key, timeout=timeout_seconds)
 
     async def generate(
         self,
@@ -142,10 +142,14 @@ class OpenAICompatibleProvider:
     """Used for OpenAI, Gemini (via its OpenAI-compatibility endpoint),
     OpenRouter, and Groq -- all speak the same chat-completions API."""
 
-    def __init__(self, name: str, base_url: str, api_key: str | None, model: str) -> None:
+    def __init__(
+        self, name: str, base_url: str, api_key: str | None, model: str, timeout_seconds: float
+    ) -> None:
         self.name = name
         self.model = model
-        self._client = AsyncOpenAI(api_key=api_key or "unset", base_url=base_url)
+        self._client = AsyncOpenAI(
+            api_key=api_key or "unset", base_url=base_url, timeout=timeout_seconds
+        )
 
     async def generate(
         self,
@@ -232,13 +236,23 @@ def build_provider(name: str, settings: "Settings") -> AIProvider:
     if name == "anthropic":
         if not settings.anthropic_api_key:
             raise ProviderNotConfiguredError("ANTHROPIC_API_KEY is not set.")
-        return AnthropicProvider(settings.anthropic_api_key, settings.anthropic_model)
+        return AnthropicProvider(
+            settings.anthropic_api_key,
+            settings.anthropic_model,
+            settings.ai_request_timeout_seconds,
+        )
 
     if name in _OPENAI_COMPATIBLE_BASE_URLS:
         api_key = getattr(settings, f"{name}_api_key")
         model = getattr(settings, f"{name}_model")
         if not api_key:
             raise ProviderNotConfiguredError(f"{name.upper()}_API_KEY is not set.")
-        return OpenAICompatibleProvider(name, _OPENAI_COMPATIBLE_BASE_URLS[name], api_key, model)
+        return OpenAICompatibleProvider(
+            name,
+            _OPENAI_COMPATIBLE_BASE_URLS[name],
+            api_key,
+            model,
+            settings.ai_request_timeout_seconds,
+        )
 
     raise ValueError(f"Unknown AI provider: {name}")

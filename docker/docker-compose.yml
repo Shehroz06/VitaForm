@@ -29,6 +29,7 @@ services:
     build:
       context: ../backend
       dockerfile: ../docker/backend.Dockerfile
+      target: dev
     depends_on:
       postgres:
         condition: service_healthy
@@ -44,13 +45,21 @@ services:
     volumes:
       - ../backend:/app
       - backend_venv:/app/.venv
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   frontend:
     build:
       context: ../frontend
       dockerfile: ../docker/frontend.Dockerfile
+      target: dev
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
     ports:

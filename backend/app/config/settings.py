@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     ai_default_provider: str = "gemini"
     ai_fallback_providers: list[str] = ["groq", "openrouter"]
     ai_max_retries: int = 2
+    # Per-call ceiling on a single provider request, and an overall ceiling
+    # across every retry/fallback attempt combined -- without these, a
+    # single slow provider can occupy a request worker for minutes (up to
+    # (ai_max_retries + 1) x len(providers) calls, each otherwise unbounded).
+    ai_request_timeout_seconds: float = 30.0
+    ai_total_timeout_seconds: float = 120.0
 
     anthropic_api_key: str | None = None
     anthropic_model: str = "claude-sonnet-4-5-20250929"
@@ -41,6 +47,12 @@ class Settings(BaseSettings):
 
     cors_origins: list[str] = ["http://localhost:3000"]
     frontend_base_url: str = "http://localhost:3000"
+    # Guards against Host-header attacks (cache poisoning, password-reset-
+    # link poisoning via a spoofed Host). "*" (no restriction) is only a
+    # safe default because _reject_insecure_production_secrets below
+    # refuses to boot with it when ENVIRONMENT=production -- real
+    # deployments must set this to their actual domain(s).
+    allowed_hosts: list[str] = ["*"]
 
     email_verification_token_expires_hours: int = 24
     password_reset_token_expires_hours: int = 1
@@ -69,13 +81,21 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _reject_insecure_production_secrets(self) -> "Settings":
-        if self.environment == "production" and (
+        if self.environment != "production":
+            return self
+
+        if (
             self.jwt_secret in _INSECURE_JWT_SECRETS
             or len(self.jwt_secret) < _MIN_JWT_SECRET_LENGTH
         ):
             raise ValueError(
                 "JWT_SECRET must be set to a random value of at least "
                 f"{_MIN_JWT_SECRET_LENGTH} characters when ENVIRONMENT=production."
+            )
+        if "*" in self.allowed_hosts:
+            raise ValueError(
+                "ALLOWED_HOSTS must be set to the real domain(s) when "
+                "ENVIRONMENT=production -- \"*\" disables Host-header validation entirely."
             )
         return self
 

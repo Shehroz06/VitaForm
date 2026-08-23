@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
+from app.core.http import content_disposition
 from app.dependencies.auth import CurrentUser
 from app.dependencies.rate_limits import (
     resume_autofit_rate_limit,
@@ -485,6 +486,6 @@ async def export_resume_tex(
         media_type="text/x-tex",
         headers={
             "Cache-Control": "no-store",
-            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Disposition": content_disposition(filename),
         },
     )

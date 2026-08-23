@@ -67,6 +67,13 @@ class UpdateMeRequest(BaseModel):
     last_name: str | None = Field(default=None, max_length=100)
 
 
+class DeleteAccountRequest(BaseModel):
+    """Password-confirmed: a bearer token alone shouldn't be enough to
+    trigger something this destructive and irreversible."""
+
+    password: str
+
+
 class UserResponse(BaseModel):
     id: uuid.UUID
     email: EmailStr

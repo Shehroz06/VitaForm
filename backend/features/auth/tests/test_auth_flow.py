@@ -14,7 +14,7 @@ async def test_register_returns_created_user(client: AsyncClient) -> None:
     assert body["success"] is True
     assert body["data"]["email"] == "new@example.com"
     assert body["data"]["is_email_verified"] is False
-    assert body["data"]["roles"] == []
+    assert body["data"]["roles"] == ["student"]
 
 
 async def test_register_sends_verification_email(
@@ -127,6 +127,31 @@ async def test_refresh_without_cookie_returns_401(client: AsyncClient) -> None:
     assert response.status_code == 401
 
 
+async def test_refresh_token_reuse_revokes_the_entire_session(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    await register_and_verify_user(client, captured_emails, "reuse@example.com")
+    login_response = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "reuse@example.com", "password": "password123"},
+    )
+    old_refresh_token = login_response.cookies["refresh_token"]
+
+    refresh_response = await client.post("/api/v1/auth/refresh")
+    assert refresh_response.status_code == 200
+    rotated_refresh_token = refresh_response.cookies["refresh_token"]
+
+    # Replay the already-rotated-away token -- this should kill the session.
+    client.cookies.set("refresh_token", old_refresh_token)
+    reuse_response = await client.post("/api/v1/auth/refresh")
+    assert reuse_response.status_code == 401
+
+    # The legitimate, still-unused rotated token must now be dead too.
+    client.cookies.set("refresh_token", rotated_refresh_token)
+    after_reuse_response = await client.post("/api/v1/auth/refresh")
+    assert after_reuse_response.status_code == 401
+
+
 async def test_logout_revokes_refresh_token(
     client: AsyncClient, captured_emails: list[dict[str, str]]
 ) -> None:
@@ -235,3 +260,58 @@ async def test_login_is_case_insensitive_for_email(
 
     assert response.status_code == 200
     assert response.json()["data"]["access_token"]
+
+
+async def test_delete_account_requires_correct_password(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    await register_and_verify_user(client, captured_emails, "deleteWrongPw@example.com")
+    login_response = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "deleteWrongPw@example.com", "password": "password123"},
+    )
+    access_token = login_response.json()["data"]["access_token"]
+
+    response = await client.request(
+        "DELETE",
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"password": "totally-wrong-password"},
+    )
+    assert response.status_code == 401
+
+
+async def test_delete_account_soft_deletes_and_revokes_sessions(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    await register_and_verify_user(client, captured_emails, "deleteMe@example.com")
+    login_response = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "deleteMe@example.com", "password": "password123"},
+    )
+    access_token = login_response.json()["data"]["access_token"]
+
+    delete_response = await client.request(
+        "DELETE",
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"password": "password123"},
+    )
+    assert delete_response.status_code == 200
+
+    # The now-deleted user's access token must stop working immediately...
+    me_response = await client.get(
+        "/api/v1/auth/me", headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert me_response.status_code == 401
+
+    # ...as must its refresh token (revoke_all_sessions_for_user).
+    refresh_response = await client.post("/api/v1/auth/refresh")
+    assert refresh_response.status_code == 401
+
+    # And the account can no longer log in.
+    login_after_delete = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "deleteMe@example.com", "password": "password123"},
+    )
+    assert login_after_delete.status_code == 401
