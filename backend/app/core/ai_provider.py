@@ -242,6 +242,17 @@ def build_provider(name: str, settings: "Settings") -> AIProvider:
             settings.ai_request_timeout_seconds,
         )
 
+    if name == "ollama":
+        # Local, unauthenticated server -- no API key required, and the
+        # base URL is configurable rather than a fixed public endpoint.
+        return OpenAICompatibleProvider(
+            "ollama",
+            settings.ollama_base_url,
+            "ollama",  # the OpenAI SDK requires a non-empty key; Ollama ignores it
+            settings.ollama_model,
+            settings.ai_request_timeout_seconds,
+        )
+
     if name in _OPENAI_COMPATIBLE_BASE_URLS:
         api_key = getattr(settings, f"{name}_api_key")
         model = getattr(settings, f"{name}_model")

@@ -10,12 +10,11 @@ from app.core.ai_provider import GenerationResult
 
 _COVER_LETTER_TEXT = (
     "Dear Hiring Manager,\n\n"
-    "I am excited to apply for this role. My background in backend engineering, "
-    "including hands-on experience with Python and cloud infrastructure, "
-    "positions me well to contribute from day one. "
-    "I have a proven track record of shipping reliable, scalable systems and "
-    "collaborating closely with cross-functional teams.\n\n"
-    "I would welcome the opportunity to discuss how my experience aligns with "
+    "I am excited to apply for this role. I bring a strong work ethic, clear "
+    "communication, and a proven ability to work closely with others to "
+    "deliver results the team can rely on. I take pride in following "
+    "through on commitments and continuously improving how I work.\n\n"
+    "I would welcome the opportunity to discuss how my background aligns with "
     "your team's needs. Thank you for your consideration.\n\n"
     "Sincerely,\nThe Candidate"
 )
@@ -65,12 +64,12 @@ class FakeCompanionProvider:
             payload = {"cover_letter": _COVER_LETTER_TEXT}
         else:
             payload = {
-                "headline": "Senior Backend Engineer | Python & Cloud Infrastructure",
+                "headline": "Engineer | Building things that last",
                 "about": (
-                    "I'm a backend engineer with hands-on experience building scalable "
-                    "Python services on cloud infrastructure. I care about clean "
-                    "architecture, reliability, and mentoring the engineers around me. "
-                    "Always open to connecting with fellow builders."
+                    "I'm an engineer who cares about doing careful, dependable work "
+                    "and communicating clearly with the people I work with. I take "
+                    "ownership of what I build and enjoy mentoring the people around "
+                    "me. Always open to connecting with fellow builders."
                 ),
             }
 

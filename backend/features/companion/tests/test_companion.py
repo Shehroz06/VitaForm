@@ -238,3 +238,43 @@ async def test_linkedin_generation_retries_after_invalid_json(
     )
     assert response.status_code == 200
     assert fake.call_count == 2
+
+
+async def test_list_cover_letters_supports_sort_query_param(
+    client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch
+) -> None:
+    headers = await _auth(client, captured_emails, "companionSort@example.com")
+    await _seed_profile_data(client, headers)
+    _patch_providers(monkeypatch, {"gemini": FakeCompanionProvider("gemini", mode="cover_letter")})
+
+    await client.post(
+        "/api/v1/ai/generate-cover-letter",
+        headers=headers,
+        json={"company_name": "Acme Corp", "role_title": "Backend Engineer"},
+    )
+    await client.post(
+        "/api/v1/ai/generate-cover-letter",
+        headers=headers,
+        json={"company_name": "Globex", "role_title": "Backend Engineer"},
+    )
+
+    asc_response = await client.get("/api/v1/cover-letters?sort=created_at", headers=headers)
+    assert [item["company_name"] for item in asc_response.json()["data"]] == [
+        "Acme Corp",
+        "Globex",
+    ]
+
+    desc_response = await client.get("/api/v1/cover-letters?sort=-created_at", headers=headers)
+    assert [item["company_name"] for item in desc_response.json()["data"]] == [
+        "Globex",
+        "Acme Corp",
+    ]
+
+
+async def test_list_cover_letters_rejects_invalid_sort_field(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "companionSortBad@example.com")
+
+    response = await client.get("/api/v1/cover-letters?sort=not_a_field", headers=headers)
+    assert response.status_code == 422

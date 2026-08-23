@@ -286,6 +286,7 @@ function ProjectDialogContent({
               <Checkbox
                 checked={isPinned}
                 onCheckedChange={(checked) => setValue("is_pinned", checked === true)}
+                aria-label="Pin this project"
               />
               Pin this project
             </label>
@@ -301,6 +302,7 @@ function ProjectDialogContent({
                   <Checkbox
                     checked={skillIds.includes(skill.id)}
                     onCheckedChange={(checked) => toggleSkill(skill.id, checked === true)}
+                    aria-label={skill.name}
                   />
                   {skill.name}
                 </label>

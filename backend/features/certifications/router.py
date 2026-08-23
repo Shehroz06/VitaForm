@@ -6,6 +6,7 @@ from fastapi import File as FileParam
 
 from app.core.base_crud import BaseOwnedCrudService
 from app.core.enums import FilePurpose
+from app.core.sorting import resolve_sort
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
 from app.schemas.response import SuccessResponse
 from features.certifications.dependencies import get_certification_service
@@ -33,12 +34,22 @@ async def list_certifications(
     service: CertificationServiceDep,
     pagination: Annotated[PaginationParams, Depends(get_pagination)],
 ) -> SuccessResponse[list[CertificationResponse]]:
+    sort_column, sort_desc = resolve_sort(
+        pagination.sort,
+        {
+            "issue_date": Certification.issue_date,
+            "created_at": Certification.created_at,
+            "updated_at": Certification.updated_at,
+        },
+        default=Certification.issue_date,
+        default_desc=True,
+    )
     items, total = await service.list_owned(
         profile.id,
         page=pagination.page,
         limit=pagination.limit,
-        sort_column=Certification.issue_date,
-        sort_desc=True,
+        sort_column=sort_column,
+        sort_desc=sort_desc,
     )
     return SuccessResponse(
         message="Certifications retrieved successfully.",

@@ -97,7 +97,7 @@ class CompanionService:
             user_prompt,
             temperature=COVER_LETTER_TEMPERATURE,
             max_tokens=_MAX_OUTPUT_TOKENS,
-            validate=validate_cover_letter_response,
+            validate=lambda text: validate_cover_letter_response(text, user_prompt),
         )
 
         if run_result.value is None:
@@ -154,7 +154,7 @@ class CompanionService:
             user_prompt,
             temperature=LINKEDIN_TEMPERATURE,
             max_tokens=_MAX_OUTPUT_TOKENS,
-            validate=validate_linkedin_response,
+            validate=lambda text: validate_linkedin_response(text, user_prompt),
         )
 
         if run_result.value is None:

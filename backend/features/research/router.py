@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from app.core.base_crud import BaseOwnedCrudService
+from app.core.sorting import resolve_sort
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
 from app.schemas.response import SuccessResponse
 from features.profiles.dependencies import CurrentProfile
@@ -26,12 +27,22 @@ async def list_research(
     service: ResearchServiceDep,
     pagination: Annotated[PaginationParams, Depends(get_pagination)],
 ) -> SuccessResponse[list[ResearchResponse]]:
+    sort_column, sort_desc = resolve_sort(
+        pagination.sort,
+        {
+            "publication_date": Research.publication_date,
+            "created_at": Research.created_at,
+            "updated_at": Research.updated_at,
+        },
+        default=Research.publication_date,
+        default_desc=True,
+    )
     items, total = await service.list_owned(
         profile.id,
         page=pagination.page,
         limit=pagination.limit,
-        sort_column=Research.publication_date,
-        sort_desc=True,
+        sort_column=sort_column,
+        sort_desc=sort_desc,
     )
     return SuccessResponse(
         message="Research retrieved successfully.",

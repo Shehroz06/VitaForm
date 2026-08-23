@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     groq_api_key: str | None = None
     groq_model: str = "llama-3.3-70b-versatile"
 
+    # Local models via Ollama's OpenAI-compatible API -- unauthenticated
+    # (no API key), and the base URL is configurable since, unlike every
+    # other provider above, it isn't a fixed public endpoint.
+    ollama_base_url: str = "http://localhost:11434/v1"
+    ollama_model: str = "llama3.1"
+
     cors_origins: list[str] = ["http://localhost:3000"]
     frontend_base_url: str = "http://localhost:3000"
     # Guards against Host-header attacks (cache poisoning, password-reset-

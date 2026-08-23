@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from app.core.base_crud import BaseOwnedCrudService
+from app.core.sorting import resolve_sort
 from app.dependencies.rate_limits import cover_letter_rate_limit, linkedin_rate_limit
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
 from app.schemas.response import SuccessResponse
@@ -54,12 +55,21 @@ async def list_cover_letters(
     service: CoverLetterCrudDep,
     pagination: Annotated[PaginationParams, Depends(get_pagination)],
 ) -> SuccessResponse[list[CoverLetterResponse]]:
+    sort_column, sort_desc = resolve_sort(
+        pagination.sort,
+        {
+            "created_at": CoverLetter.created_at,
+            "updated_at": CoverLetter.updated_at,
+        },
+        default=CoverLetter.created_at,
+        default_desc=True,
+    )
     items, total = await service.list_owned(
         profile.id,
         page=pagination.page,
         limit=pagination.limit,
-        sort_column=CoverLetter.created_at,
-        sort_desc=True,
+        sort_column=sort_column,
+        sort_desc=sort_desc,
     )
     return SuccessResponse(
         message="Cover letters retrieved successfully.",
@@ -110,12 +120,21 @@ async def list_linkedin_generations(
     service: LinkedinCrudDep,
     pagination: Annotated[PaginationParams, Depends(get_pagination)],
 ) -> SuccessResponse[list[LinkedinGenerationResponse]]:
+    sort_column, sort_desc = resolve_sort(
+        pagination.sort,
+        {
+            "created_at": LinkedinGeneration.created_at,
+            "updated_at": LinkedinGeneration.updated_at,
+        },
+        default=LinkedinGeneration.created_at,
+        default_desc=True,
+    )
     items, total = await service.list_owned(
         profile.id,
         page=pagination.page,
         limit=pagination.limit,
-        sort_column=LinkedinGeneration.created_at,
-        sort_desc=True,
+        sort_column=sort_column,
+        sort_desc=sort_desc,
     )
     return SuccessResponse(
         message="LinkedIn generations retrieved successfully.",

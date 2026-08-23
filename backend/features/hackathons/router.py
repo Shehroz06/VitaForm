@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from app.core.base_crud import BaseOwnedCrudService
+from app.core.sorting import resolve_sort
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
 from app.schemas.response import SuccessResponse
 from features.hackathons.dependencies import get_hackathon_service
@@ -26,12 +27,22 @@ async def list_hackathons(
     service: HackathonServiceDep,
     pagination: Annotated[PaginationParams, Depends(get_pagination)],
 ) -> SuccessResponse[list[HackathonResponse]]:
+    sort_column, sort_desc = resolve_sort(
+        pagination.sort,
+        {
+            "event_date": Hackathon.event_date,
+            "created_at": Hackathon.created_at,
+            "updated_at": Hackathon.updated_at,
+        },
+        default=Hackathon.event_date,
+        default_desc=True,
+    )
     items, total = await service.list_owned(
         profile.id,
         page=pagination.page,
         limit=pagination.limit,
-        sort_column=Hackathon.event_date,
-        sort_desc=True,
+        sort_column=sort_column,
+        sort_desc=sort_desc,
     )
     return SuccessResponse(
         message="Hackathons retrieved successfully.",

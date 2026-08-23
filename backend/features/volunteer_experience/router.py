@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from app.core.base_crud import BaseOwnedCrudService
+from app.core.sorting import resolve_sort
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
 from app.schemas.response import SuccessResponse
 from features.profiles.dependencies import CurrentProfile
@@ -28,12 +29,22 @@ async def list_volunteer_experience(
     service: VolunteerExperienceServiceDep,
     pagination: Annotated[PaginationParams, Depends(get_pagination)],
 ) -> SuccessResponse[list[VolunteerExperienceResponse]]:
+    sort_column, sort_desc = resolve_sort(
+        pagination.sort,
+        {
+            "start_date": VolunteerExperience.start_date,
+            "created_at": VolunteerExperience.created_at,
+            "updated_at": VolunteerExperience.updated_at,
+        },
+        default=VolunteerExperience.start_date,
+        default_desc=True,
+    )
     items, total = await service.list_owned(
         profile.id,
         page=pagination.page,
         limit=pagination.limit,
-        sort_column=VolunteerExperience.start_date,
-        sort_desc=True,
+        sort_column=sort_column,
+        sort_desc=sort_desc,
     )
     return SuccessResponse(
         message="Volunteer experience retrieved successfully.",

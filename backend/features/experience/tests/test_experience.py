@@ -103,3 +103,48 @@ async def test_users_cannot_access_each_others_experience(
 
     response = await client.get(f"/api/v1/experience/{experience_id}", headers=headers_b)
     assert response.status_code == 404
+
+
+async def test_list_experience_supports_sort_query_param(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "expSort@example.com")
+
+    async def _create(company: str, start_date: str) -> None:
+        await client.post(
+            "/api/v1/experience",
+            headers=headers,
+            json={
+                "company_name": company,
+                "job_title": "Engineer",
+                "employment_type": "contract",
+                "start_date": start_date,
+            },
+        )
+
+    await _create("First", "2020-01-01")
+    await _create("Second", "2021-01-01")
+    await _create("Third", "2022-01-01")
+
+    asc_response = await client.get("/api/v1/experience?sort=created_at", headers=headers)
+    assert [item["company_name"] for item in asc_response.json()["data"]] == [
+        "First",
+        "Second",
+        "Third",
+    ]
+
+    desc_response = await client.get("/api/v1/experience?sort=-created_at", headers=headers)
+    assert [item["company_name"] for item in desc_response.json()["data"]] == [
+        "Third",
+        "Second",
+        "First",
+    ]
+
+
+async def test_list_experience_rejects_invalid_sort_field(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "expSortBad@example.com")
+
+    response = await client.get("/api/v1/experience?sort=not_a_field", headers=headers)
+    assert response.status_code == 422

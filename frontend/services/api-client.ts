@@ -36,19 +36,35 @@ async function rawRequest(path: string, init?: RequestInit): Promise<Response> {
   });
 }
 
+// Several TanStack queries can 401 at once when the access token expires,
+// each independently calling refreshAccessToken(). Without memoizing the
+// in-flight request, the first caller's refresh rotates the (single-use)
+// refresh cookie, and every other caller's own refresh attempt then hits
+// an already-rotated-away token and fails, logging the user out. Sharing
+// one in-flight promise across concurrent callers avoids that race.
+let inFlightRefresh: Promise<boolean> | null = null;
+
 async function refreshAccessToken(): Promise<boolean> {
-  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-    method: "POST",
-    credentials: "include",
+  if (inFlightRefresh) return inFlightRefresh;
+
+  inFlightRefresh = (async () => {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+    });
+
+    if (!response.ok) return false;
+
+    const body = (await response.json()) as ApiResponse<{ access_token: string }>;
+    if (!body.success) return false;
+
+    useAuthStore.getState().setAccessToken(body.data.access_token);
+    return true;
+  })().finally(() => {
+    inFlightRefresh = null;
   });
 
-  if (!response.ok) return false;
-
-  const body = (await response.json()) as ApiResponse<{ access_token: string }>;
-  if (!body.success) return false;
-
-  useAuthStore.getState().setAccessToken(body.data.access_token);
-  return true;
+  return inFlightRefresh;
 }
 
 async function requestWithRetry(path: string, init?: RequestInit): Promise<Response> {

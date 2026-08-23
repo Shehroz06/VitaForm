@@ -91,6 +91,11 @@ class ResumeService:
             raise ResourceNotFoundException("Resume has no versions.")
         return version
 
+    async def get_latest_versions_by_resume(
+        self, resume_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, ResumeVersion]:
+        return await self._versions.get_latest_for_resumes(resume_ids)
+
     async def list_versions(
         self, resume: Resume, *, page: int = 1, limit: int = 20
     ) -> tuple[list[ResumeVersion], int]:

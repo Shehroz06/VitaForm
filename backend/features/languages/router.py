@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from app.core.base_crud import BaseOwnedCrudService
+from app.core.sorting import resolve_sort
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
 from app.schemas.response import SuccessResponse
 from features.languages.dependencies import get_language_service
@@ -26,11 +27,22 @@ async def list_languages(
     service: LanguageServiceDep,
     pagination: Annotated[PaginationParams, Depends(get_pagination)],
 ) -> SuccessResponse[list[LanguageResponse]]:
+    sort_column, sort_desc = resolve_sort(
+        pagination.sort,
+        {
+            "name": Language.name,
+            "created_at": Language.created_at,
+            "updated_at": Language.updated_at,
+        },
+        default=Language.name,
+        default_desc=False,
+    )
     items, total = await service.list_owned(
         profile.id,
         page=pagination.page,
         limit=pagination.limit,
-        sort_column=Language.name,
+        sort_column=sort_column,
+        sort_desc=sort_desc,
     )
     return SuccessResponse(
         message="Languages retrieved successfully.",

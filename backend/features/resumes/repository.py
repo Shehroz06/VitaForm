@@ -3,6 +3,7 @@ from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.core.base_crud import BaseRepository
 from features.resumes.models import Resume, ResumeTemplate, ResumeVersion
@@ -42,6 +43,36 @@ class ResumeVersionRepository(BaseRepository[ResumeVersion]):
             .limit(1)
         )
         return (await self._db.execute(stmt)).scalar_one_or_none()
+
+    async def get_latest_for_resumes(
+        self, resume_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, ResumeVersion]:
+        """Batched equivalent of calling get_latest once per id -- one
+        windowed query instead of N, for list endpoints that need every
+        resume's latest version at once."""
+        if not resume_ids:
+            return {}
+
+        row_number = (
+            func.row_number()
+            .over(
+                partition_by=ResumeVersion.resume_id,
+                order_by=ResumeVersion.version_number.desc(),
+            )
+            .label("row_number")
+        )
+        ranked = (
+            select(ResumeVersion, row_number)
+            .where(
+                ResumeVersion.resume_id.in_(resume_ids),
+                ResumeVersion.deleted_at.is_(None),
+            )
+            .subquery()
+        )
+        latest_version = aliased(ResumeVersion, ranked)
+        stmt = select(latest_version).where(ranked.c.row_number == 1)
+        result = await self._db.execute(stmt)
+        return {version.resume_id: version for version in result.scalars().all()}
 
     async def get_by_number(
         self, resume_id: uuid.UUID, version_id: uuid.UUID

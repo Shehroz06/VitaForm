@@ -29,7 +29,7 @@ from features.resumes.dependencies import (
     get_resume_template_repository,
 )
 from features.resumes.export_service import ResumeExportService
-from features.resumes.models import Resume
+from features.resumes.models import Resume, ResumeVersion
 from features.resumes.repository import ResumeTemplateRepository
 from features.resumes.schemas import (
     PreviewWithRequest,
@@ -61,8 +61,7 @@ def _full_name(first_name: str | None, last_name: str | None) -> str:
     return " ".join(part for part in (first_name, last_name) if part).strip()
 
 
-async def _to_resume_response(resume: Resume, service: ResumeService) -> ResumeResponse:
-    latest = await service.get_latest_version(resume)
+def _to_resume_response(resume: Resume, latest: ResumeVersion) -> ResumeResponse:
     return ResumeResponse(
         id=resume.id,
         title=resume.title,
@@ -117,9 +116,16 @@ async def list_resumes(
     items, total = await service.list_resumes(
         profile.id, page=pagination.page, limit=pagination.limit
     )
+    latest_by_resume = await service.get_latest_versions_by_resume([item.id for item in items])
+    responses: list[ResumeResponse] = []
+    for item in items:
+        latest = latest_by_resume.get(item.id)
+        if latest is None:
+            raise ResourceNotFoundException("Resume has no versions.")
+        responses.append(_to_resume_response(item, latest))
     return SuccessResponse(
         message="Resumes retrieved successfully.",
-        data=[await _to_resume_response(item, service) for item in items],
+        data=responses,
         meta=build_pagination_meta(pagination.page, pagination.limit, total),
     )
 
@@ -133,8 +139,9 @@ async def create_resume(
     service: ResumeServiceDep,
 ) -> SuccessResponse[ResumeResponse]:
     resume = await service.create_resume(profile.id, data.title, data.template_id)
+    latest = await service.get_latest_version(resume)
     return SuccessResponse(
-        message="Resume created successfully.", data=await _to_resume_response(resume, service)
+        message="Resume created successfully.", data=_to_resume_response(resume, latest)
     )
 
 
@@ -175,8 +182,9 @@ async def get_resume(
     service: ResumeServiceDep,
 ) -> SuccessResponse[ResumeResponse]:
     resume = await service.get_owned_resume(resume_id, profile.id)
+    latest = await service.get_latest_version(resume)
     return SuccessResponse(
-        message="Resume retrieved successfully.", data=await _to_resume_response(resume, service)
+        message="Resume retrieved successfully.", data=_to_resume_response(resume, latest)
     )
 
 
@@ -190,8 +198,9 @@ async def update_resume(
     resume = await service.update_resume(
         resume_id, profile.id, **data.model_dump(exclude_unset=True)
     )
+    latest = await service.get_latest_version(resume)
     return SuccessResponse(
-        message="Resume updated successfully.", data=await _to_resume_response(resume, service)
+        message="Resume updated successfully.", data=_to_resume_response(resume, latest)
     )
 
 

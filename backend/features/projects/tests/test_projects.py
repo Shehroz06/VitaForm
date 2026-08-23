@@ -166,3 +166,29 @@ async def test_users_cannot_access_each_others_projects(
 
     response = await client.get(f"/api/v1/projects/{project_id}", headers=headers_b)
     assert response.status_code == 404
+
+
+async def test_list_projects_supports_sort_by_updated_at(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "projSort@example.com")
+    first = await client.post("/api/v1/projects", headers=headers, json={"title": "First"})
+    await client.post("/api/v1/projects", headers=headers, json={"title": "Second"})
+    first_id = first.json()["data"]["id"]
+
+    await client.patch(
+        f"/api/v1/projects/{first_id}", headers=headers, json={"title": "First Updated"}
+    )
+
+    response = await client.get("/api/v1/projects?sort=-updated_at", headers=headers)
+    titles = [item["title"] for item in response.json()["data"]]
+    assert titles[0] == "First Updated"
+
+
+async def test_list_projects_rejects_invalid_sort_field(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "projSortBad@example.com")
+
+    response = await client.get("/api/v1/projects?sort=not_a_field", headers=headers)
+    assert response.status_code == 422

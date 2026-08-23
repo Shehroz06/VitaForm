@@ -6,6 +6,7 @@ from fastapi import File as FileParam
 
 from app.core.base_crud import BaseOwnedCrudService
 from app.core.enums import FilePurpose
+from app.core.sorting import resolve_sort
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
 from app.schemas.response import SuccessResponse
 from features.achievements.dependencies import get_achievement_service
@@ -33,12 +34,22 @@ async def list_achievements(
     service: AchievementServiceDep,
     pagination: Annotated[PaginationParams, Depends(get_pagination)],
 ) -> SuccessResponse[list[AchievementResponse]]:
+    sort_column, sort_desc = resolve_sort(
+        pagination.sort,
+        {
+            "date_achieved": Achievement.date_achieved,
+            "created_at": Achievement.created_at,
+            "updated_at": Achievement.updated_at,
+        },
+        default=Achievement.date_achieved,
+        default_desc=True,
+    )
     items, total = await service.list_owned(
         profile.id,
         page=pagination.page,
         limit=pagination.limit,
-        sort_column=Achievement.date_achieved,
-        sort_desc=True,
+        sort_column=sort_column,
+        sort_desc=sort_desc,
     )
     return SuccessResponse(
         message="Achievements retrieved successfully.",

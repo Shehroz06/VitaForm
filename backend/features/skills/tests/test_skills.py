@@ -99,3 +99,27 @@ async def test_users_cannot_access_each_others_skills(
 
     response = await client.delete(f"/api/v1/skills/{skill_id}", headers=headers_b)
     assert response.status_code == 404
+
+
+async def test_list_skills_supports_sort_query_param(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "skillSort@example.com")
+    await client.post(
+        "/api/v1/skills", headers=headers, json={"name": "Zebra", "category": "technical"}
+    )
+    await client.post(
+        "/api/v1/skills", headers=headers, json={"name": "Apple", "category": "technical"}
+    )
+
+    response = await client.get("/api/v1/skills?sort=-created_at", headers=headers)
+    assert [item["name"] for item in response.json()["data"]] == ["Apple", "Zebra"]
+
+
+async def test_list_skills_rejects_invalid_sort_field(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "skillSortBad@example.com")
+
+    response = await client.get("/api/v1/skills?sort=not_a_field", headers=headers)
+    assert response.status_code == 422

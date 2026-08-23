@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from app.core.base_crud import BaseOwnedCrudService
+from app.core.sorting import resolve_sort
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
 from app.schemas.response import SuccessResponse
 from features.leadership_roles.dependencies import get_leadership_role_service
@@ -28,12 +29,22 @@ async def list_leadership_roles(
     service: LeadershipRoleServiceDep,
     pagination: Annotated[PaginationParams, Depends(get_pagination)],
 ) -> SuccessResponse[list[LeadershipRoleResponse]]:
+    sort_column, sort_desc = resolve_sort(
+        pagination.sort,
+        {
+            "start_date": LeadershipRole.start_date,
+            "created_at": LeadershipRole.created_at,
+            "updated_at": LeadershipRole.updated_at,
+        },
+        default=LeadershipRole.start_date,
+        default_desc=True,
+    )
     items, total = await service.list_owned(
         profile.id,
         page=pagination.page,
         limit=pagination.limit,
-        sort_column=LeadershipRole.start_date,
-        sort_desc=True,
+        sort_column=sort_column,
+        sort_desc=sort_desc,
     )
     return SuccessResponse(
         message="Leadership roles retrieved successfully.",
