@@ -4,6 +4,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.dependencies.auth import CurrentUser
+from app.dependencies.rate_limits import (
+    resume_autofit_rate_limit,
+    resume_export_rate_limit,
+    resume_generate_rate_limit,
+    resume_preview_rate_limit,
+    rewrite_text_rate_limit,
+    template_preview_rate_limit,
+)
 from app.exceptions.base import ResourceNotFoundException
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
 from app.schemas.response import SuccessResponse
@@ -75,7 +83,10 @@ async def list_resume_templates(
     )
 
 
-@router.post("/resume-templates/{template_id}/preview")
+@router.post(
+    "/resume-templates/{template_id}/preview",
+    dependencies=[Depends(template_preview_rate_limit)],
+)
 async def preview_resume_template(
     template_id: uuid.UUID,
     data: TemplateSampleRequest,
@@ -126,7 +137,11 @@ async def create_resume(
     )
 
 
-@router.post("/resumes/generate", response_model=SuccessResponse[GenerateResumeResponse])
+@router.post(
+    "/resumes/generate",
+    response_model=SuccessResponse[GenerateResumeResponse],
+    dependencies=[Depends(resume_generate_rate_limit)],
+)
 async def generate_resume(
     data: ResumeGenerateRequest,
     profile: CurrentProfile,
@@ -237,7 +252,9 @@ async def autosave_resume_content(
 
 
 @router.post(
-    "/resumes/{resume_id}/rewrite-text", response_model=SuccessResponse[RewriteTextResponse]
+    "/resumes/{resume_id}/rewrite-text",
+    response_model=SuccessResponse[RewriteTextResponse],
+    dependencies=[Depends(rewrite_text_rate_limit)],
 )
 async def rewrite_resume_text(
     resume_id: uuid.UUID,
@@ -300,7 +317,11 @@ async def get_resume_version(
     )
 
 
-@router.post("/resumes/{resume_id}/export", response_model=SuccessResponse[FileAttachmentResponse])
+@router.post(
+    "/resumes/{resume_id}/export",
+    response_model=SuccessResponse[FileAttachmentResponse],
+    dependencies=[Depends(resume_export_rate_limit)],
+)
 async def export_resume(
     resume_id: uuid.UUID,
     profile: CurrentProfile,
@@ -326,7 +347,11 @@ async def export_resume(
     )
 
 
-@router.post("/resumes/{resume_id}/autofit", response_model=SuccessResponse[ResumeAutofitResponse])
+@router.post(
+    "/resumes/{resume_id}/autofit",
+    response_model=SuccessResponse[ResumeAutofitResponse],
+    dependencies=[Depends(resume_autofit_rate_limit)],
+)
 async def autofit_resume(
     resume_id: uuid.UUID,
     profile: CurrentProfile,
@@ -363,7 +388,10 @@ async def autofit_resume(
     )
 
 
-@router.get("/resumes/{resume_id}/preview")
+@router.get(
+    "/resumes/{resume_id}/preview",
+    dependencies=[Depends(resume_preview_rate_limit)],
+)
 async def preview_resume(
     resume_id: uuid.UUID,
     profile: CurrentProfile,
@@ -397,7 +425,10 @@ async def preview_resume(
     )
 
 
-@router.post("/resumes/{resume_id}/preview-with")
+@router.post(
+    "/resumes/{resume_id}/preview-with",
+    dependencies=[Depends(resume_preview_rate_limit)],
+)
 async def preview_resume_with(
     resume_id: uuid.UUID,
     data: PreviewWithRequest,

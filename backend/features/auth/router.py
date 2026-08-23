@@ -1,10 +1,17 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Cookie, Depends, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config.settings import get_settings
 from app.database.session import get_db
 from app.dependencies.auth import CurrentUser, require_role
+from app.dependencies.rate_limits import (
+    forgot_password_rate_limit,
+    login_rate_limit,
+    register_rate_limit,
+)
+from app.exceptions.base import AuthenticationException
 from app.schemas.response import MessageResponse, SuccessResponse
 from features.auth.dependencies import (
     get_admin_reset_password_use_case,
@@ -19,14 +26,13 @@ from features.auth.dependencies import (
 from features.auth.models import User
 from features.auth.repository import AuthRepository
 from features.auth.schemas import (
+    AccessTokenResponse,
     AdminResetPasswordRequest,
     ForgotPasswordRequest,
+    IssuedTokenPair,
     LoginRequest,
-    LogoutRequest,
-    RefreshRequest,
     RegisterRequest,
     ResetPasswordRequest,
-    TokenResponse,
     UpdateMeRequest,
     UserResponse,
     VerifyEmailRequest,
@@ -44,6 +50,41 @@ from features.auth.use_cases import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+settings = get_settings()
+
+_REFRESH_COOKIE_NAME = "refresh_token"
+# Scoped to /api/v1/auth so the browser only ever sends this cookie to the
+# endpoints that need it (refresh, logout), not to every request on the API
+# origin.
+_REFRESH_COOKIE_PATH = "/api/v1/auth"
+
+
+def _set_refresh_cookie(response: Response, raw_refresh_token: str) -> None:
+    response.set_cookie(
+        key=_REFRESH_COOKIE_NAME,
+        value=raw_refresh_token,
+        max_age=settings.jwt_refresh_token_expires_days * 24 * 60 * 60,
+        httponly=True,
+        # Lax (not None) works here because frontend and backend are
+        # same-site (share a registrable domain, differing only by port/
+        # subdomain) in both local dev and the intended deployment shape --
+        # a genuinely cross-site deployment would need SameSite=None+Secure.
+        samesite="lax",
+        secure=settings.environment == "production",
+        path=_REFRESH_COOKIE_PATH,
+    )
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(key=_REFRESH_COOKIE_NAME, path=_REFRESH_COOKIE_PATH)
+
+
+def _to_access_token_response(tokens: IssuedTokenPair) -> AccessTokenResponse:
+    return AccessTokenResponse(
+        access_token=tokens.access_token,
+        token_type=tokens.token_type,
+        expires_in=tokens.expires_in,
+    )
 
 
 def _to_user_response(user: User) -> UserResponse:
@@ -69,6 +110,7 @@ def _request_context(request: Request) -> RequestContext:
     "/register",
     response_model=SuccessResponse[UserResponse],
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(register_rate_limit)],
 )
 async def register(
     data: RegisterRequest,
@@ -81,31 +123,48 @@ async def register(
     )
 
 
-@router.post("/login", response_model=SuccessResponse[TokenResponse])
+@router.post(
+    "/login",
+    response_model=SuccessResponse[AccessTokenResponse],
+    dependencies=[Depends(login_rate_limit)],
+)
 async def login(
     data: LoginRequest,
     request: Request,
+    response: Response,
     use_case: Annotated[LoginUser, Depends(get_login_use_case)],
-) -> SuccessResponse[TokenResponse]:
+) -> SuccessResponse[AccessTokenResponse]:
     _, tokens = await use_case.execute(data, _request_context(request))
-    return SuccessResponse(message="Logged in successfully.", data=tokens)
+    _set_refresh_cookie(response, tokens.refresh_token)
+    return SuccessResponse(
+        message="Logged in successfully.", data=_to_access_token_response(tokens)
+    )
 
 
-@router.post("/refresh", response_model=SuccessResponse[TokenResponse])
+@router.post("/refresh", response_model=SuccessResponse[AccessTokenResponse])
 async def refresh(
-    data: RefreshRequest,
+    response: Response,
     use_case: Annotated[RefreshAccessToken, Depends(get_refresh_use_case)],
-) -> SuccessResponse[TokenResponse]:
-    tokens = await use_case.execute(data.refresh_token)
-    return SuccessResponse(message="Token refreshed successfully.", data=tokens)
+    refresh_token: Annotated[str | None, Cookie(alias=_REFRESH_COOKIE_NAME)] = None,
+) -> SuccessResponse[AccessTokenResponse]:
+    if refresh_token is None:
+        raise AuthenticationException("Refresh token was not provided.")
+    tokens = await use_case.execute(refresh_token)
+    _set_refresh_cookie(response, tokens.refresh_token)
+    return SuccessResponse(
+        message="Token refreshed successfully.", data=_to_access_token_response(tokens)
+    )
 
 
 @router.post("/logout", response_model=SuccessResponse[MessageResponse])
 async def logout(
-    data: LogoutRequest,
+    response: Response,
     use_case: Annotated[LogoutUser, Depends(get_logout_use_case)],
+    refresh_token: Annotated[str | None, Cookie(alias=_REFRESH_COOKIE_NAME)] = None,
 ) -> SuccessResponse[MessageResponse]:
-    await use_case.execute(data.refresh_token)
+    if refresh_token is not None:
+        await use_case.execute(refresh_token)
+    _clear_refresh_cookie(response)
     return SuccessResponse(
         message="Logged out successfully.", data=MessageResponse(message="Logged out.")
     )
@@ -120,7 +179,11 @@ async def verify_email(
     return SuccessResponse(message="Email verified successfully.", data=_to_user_response(user))
 
 
-@router.post("/forgot-password", response_model=SuccessResponse[MessageResponse])
+@router.post(
+    "/forgot-password",
+    response_model=SuccessResponse[MessageResponse],
+    dependencies=[Depends(forgot_password_rate_limit)],
+)
 async def forgot_password(
     data: ForgotPasswordRequest,
     use_case: Annotated[RequestPasswordReset, Depends(get_request_password_reset_use_case)],

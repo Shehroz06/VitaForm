@@ -18,9 +18,23 @@ from app.core.email import get_email_sender
 from app.database import models_registry  # noqa: F401  (registers all feature tables)
 from app.database.base import Base
 from app.database.session import get_db
+from app.dependencies import rate_limits
+from app.dependencies.rate_limit import IpRateLimit, UserRateLimit
 from app.main import create_app
 from features.auth.constants import DEFAULT_ROLES
 from features.resumes.constants import ADDITIONAL_TEMPLATES, ATS_SAFE_TEMPLATES, DEFAULT_TEMPLATES
+
+# Rate limiting is real infrastructure (Redis-backed) that these tests don't
+# stand up, and its whole point is to reject a high volume of requests from
+# the same identity -- exactly what this suite does deliberately (hundreds
+# of register/login calls sharing one test-client IP). Override every named
+# limiter to a no-op, by identity, the same way get_db/get_email_sender are
+# swapped for fakes below.
+_RATE_LIMITERS = [
+    limiter
+    for limiter in vars(rate_limits).values()
+    if isinstance(limiter, (IpRateLimit, UserRateLimit))
+]
 
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL",
@@ -145,6 +159,8 @@ async def client(  # type: ignore[no-untyped-def]
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_email_sender] = lambda: FakeEmailSender()
+    for limiter in _RATE_LIMITERS:
+        app.dependency_overrides[limiter] = lambda: None
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

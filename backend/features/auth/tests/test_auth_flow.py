@@ -79,9 +79,10 @@ async def test_full_login_flow_returns_token_pair(
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["access_token"]
-    assert data["refresh_token"]
+    assert "refresh_token" not in data
     assert data["token_type"] == "bearer"
     assert data["expires_in"] == 900
+    assert response.cookies.get("refresh_token") is not None
 
 
 async def test_login_with_wrong_password_returns_401(
@@ -105,39 +106,40 @@ async def test_refresh_rotates_token_and_invalidates_old_one(
         "/api/v1/auth/login",
         json={"email": "refresh@example.com", "password": "password123"},
     )
-    old_refresh_token = login_response.json()["data"]["refresh_token"]
+    old_refresh_token = login_response.cookies["refresh_token"]
 
-    refresh_response = await client.post(
-        "/api/v1/auth/refresh", json={"refresh_token": old_refresh_token}
-    )
+    # The refresh token travels as an HttpOnly cookie, not a body field --
+    # httpx's client-level cookie jar carries it automatically here.
+    refresh_response = await client.post("/api/v1/auth/refresh")
     assert refresh_response.status_code == 200
-    new_refresh_token = refresh_response.json()["data"]["refresh_token"]
+    assert "refresh_token" not in refresh_response.json()["data"]
+    new_refresh_token = refresh_response.cookies["refresh_token"]
     assert new_refresh_token != old_refresh_token
 
-    reuse_response = await client.post(
-        "/api/v1/auth/refresh", json={"refresh_token": old_refresh_token}
-    )
+    # Explicitly replay the now-rotated-away old cookie value.
+    client.cookies.set("refresh_token", old_refresh_token)
+    reuse_response = await client.post("/api/v1/auth/refresh")
     assert reuse_response.status_code == 401
+
+
+async def test_refresh_without_cookie_returns_401(client: AsyncClient) -> None:
+    response = await client.post("/api/v1/auth/refresh")
+    assert response.status_code == 401
 
 
 async def test_logout_revokes_refresh_token(
     client: AsyncClient, captured_emails: list[dict[str, str]]
 ) -> None:
     await register_and_verify_user(client, captured_emails, "logout@example.com")
-    login_response = await client.post(
+    await client.post(
         "/api/v1/auth/login",
         json={"email": "logout@example.com", "password": "password123"},
     )
-    refresh_token = login_response.json()["data"]["refresh_token"]
 
-    logout_response = await client.post(
-        "/api/v1/auth/logout", json={"refresh_token": refresh_token}
-    )
+    logout_response = await client.post("/api/v1/auth/logout")
     assert logout_response.status_code == 200
 
-    refresh_after_logout = await client.post(
-        "/api/v1/auth/refresh", json={"refresh_token": refresh_token}
-    )
+    refresh_after_logout = await client.post("/api/v1/auth/refresh")
     assert refresh_after_logout.status_code == 401
 
 

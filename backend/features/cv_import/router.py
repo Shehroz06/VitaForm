@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, UploadFile, status
 from fastapi import File as FileParam
 
 from app.core.uploads import read_upload_capped
+from app.dependencies.rate_limits import cv_import_rate_limit
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
 from app.schemas.response import SuccessResponse
 from features.cv_import.dependencies import get_import_service
@@ -26,6 +27,7 @@ ImportServiceDep = Annotated[ImportService, Depends(get_import_service)]
     "/sessions",
     response_model=SuccessResponse[ImportSessionResponse],
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(cv_import_rate_limit)],
 )
 async def create_import_session(
     profile: CurrentProfile,

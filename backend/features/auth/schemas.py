@@ -30,14 +30,6 @@ class LoginRequest(BaseModel):
     password: str
 
 
-class RefreshRequest(BaseModel):
-    refresh_token: str
-
-
-class LogoutRequest(BaseModel):
-    refresh_token: str
-
-
 class VerifyEmailRequest(BaseModel):
     token: str
 
@@ -85,8 +77,19 @@ class UserResponse(BaseModel):
     created_at: datetime
 
 
-class TokenResponse(BaseModel):
+class IssuedTokenPair(BaseModel):
+    """Internal DTO passed from the service layer to the router -- never
+    serialized directly as an API response. The router splits it: the
+    refresh token goes into an HttpOnly cookie, and AccessTokenResponse
+    (access token only) is what the client actually receives in the body."""
+
     access_token: str
     refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+
+class AccessTokenResponse(BaseModel):
+    access_token: str
     token_type: str = "bearer"
     expires_in: int

@@ -8,9 +8,8 @@ export interface User {
   created_at: string;
 }
 
-export interface TokenResponse {
+export interface AccessTokenResponse {
   access_token: string;
-  refresh_token: string;
   token_type: string;
   expires_in: number;
 }

@@ -21,10 +21,10 @@ from features.auth.repository import AuthRepository
 from features.auth.schemas import (
     AdminResetPasswordRequest,
     ForgotPasswordRequest,
+    IssuedTokenPair,
     LoginRequest,
     RegisterRequest,
     ResetPasswordRequest,
-    TokenResponse,
     VerifyEmailRequest,
 )
 from features.auth.service import AuthService
@@ -86,7 +86,7 @@ class LoginUser:
 
     async def execute(
         self, data: LoginRequest, context: RequestContext
-    ) -> tuple[User, TokenResponse]:
+    ) -> tuple[User, IssuedTokenPair]:
         user = await self._repository.get_user_by_email(data.email)
         if user is None or not verify_password(data.password, user.password_hash):
             raise InvalidCredentialsError
@@ -110,7 +110,7 @@ class RefreshAccessToken:
     def __init__(self, service: AuthService) -> None:
         self._service = service
 
-    async def execute(self, raw_refresh_token: str) -> TokenResponse:
+    async def execute(self, raw_refresh_token: str) -> IssuedTokenPair:
         return await self._service.rotate_refresh_token(raw_refresh_token)
 
 

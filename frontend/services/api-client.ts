@@ -24,6 +24,10 @@ async function rawRequest(path: string, init?: RequestInit): Promise<Response> {
 
   return fetch(`${API_BASE_URL}${path}`, {
     ...init,
+    // The refresh token travels as an HttpOnly cookie (never readable by
+    // JS), which only gets attached -- on this cross-origin dev setup and
+    // any same-site production deployment -- when the request opts in.
+    credentials: "include",
     headers: {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
@@ -33,24 +37,17 @@ async function rawRequest(path: string, init?: RequestInit): Promise<Response> {
 }
 
 async function refreshAccessToken(): Promise<boolean> {
-  const refreshToken = useAuthStore.getState().refreshToken;
-  if (!refreshToken) return false;
-
   const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token: refreshToken }),
+    credentials: "include",
   });
 
   if (!response.ok) return false;
 
-  const body = (await response.json()) as ApiResponse<{
-    access_token: string;
-    refresh_token: string;
-  }>;
+  const body = (await response.json()) as ApiResponse<{ access_token: string }>;
   if (!body.success) return false;
 
-  useAuthStore.getState().setAccessToken(body.data.access_token, body.data.refresh_token);
+  useAuthStore.getState().setAccessToken(body.data.access_token);
   return true;
 }
 

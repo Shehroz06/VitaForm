@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from app.core.base_crud import BaseOwnedCrudService
+from app.dependencies.rate_limits import cover_letter_rate_limit, linkedin_rate_limit
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
 from app.schemas.response import SuccessResponse
 from features.companion.dependencies import (
@@ -32,7 +33,11 @@ LinkedinCrudDep = Annotated[
 ]
 
 
-@router.post("/ai/generate-cover-letter", response_model=SuccessResponse[CoverLetterResponse])
+@router.post(
+    "/ai/generate-cover-letter",
+    response_model=SuccessResponse[CoverLetterResponse],
+    dependencies=[Depends(cover_letter_rate_limit)],
+)
 async def generate_cover_letter(
     data: GenerateCoverLetterRequest, profile: CurrentProfile, service: CompanionServiceDep
 ) -> SuccessResponse[CoverLetterResponse]:
@@ -81,7 +86,11 @@ async def delete_cover_letter(
     await service.delete_owned(cover_letter_id, profile.id)
 
 
-@router.post("/ai/generate-linkedin", response_model=SuccessResponse[LinkedinGenerationResponse])
+@router.post(
+    "/ai/generate-linkedin",
+    response_model=SuccessResponse[LinkedinGenerationResponse],
+    dependencies=[Depends(linkedin_rate_limit)],
+)
 async def generate_linkedin(
     data: GenerateLinkedinRequest, profile: CurrentProfile, service: CompanionServiceDep
 ) -> SuccessResponse[LinkedinGenerationResponse]:

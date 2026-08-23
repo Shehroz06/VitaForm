@@ -1,10 +1,10 @@
 import { apiClient } from "@/services/api-client";
 import type {
+  AccessTokenResponse,
   ForgotPasswordPayload,
   LoginPayload,
   RegisterPayload,
   ResetPasswordPayload,
-  TokenResponse,
   UpdateMePayload,
   User,
   VerifyEmailPayload,
@@ -12,9 +12,10 @@ import type {
 
 export const authService = {
   register: (payload: RegisterPayload) => apiClient.post<User>("/auth/register", payload),
-  login: (payload: LoginPayload) => apiClient.post<TokenResponse>("/auth/login", payload),
-  logout: (refreshToken: string) =>
-    apiClient.post<{ message: string }>("/auth/logout", { refresh_token: refreshToken }),
+  login: (payload: LoginPayload) => apiClient.post<AccessTokenResponse>("/auth/login", payload),
+  // No refresh token to send -- the server reads it from the HttpOnly
+  // cookie the browser attaches automatically.
+  logout: () => apiClient.post<{ message: string }>("/auth/logout"),
   verifyEmail: (payload: VerifyEmailPayload) =>
     apiClient.post<User>("/auth/verify-email", payload),
   forgotPassword: (payload: ForgotPasswordPayload) =>

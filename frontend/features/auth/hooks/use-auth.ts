@@ -24,25 +24,20 @@ export function useLogin() {
   return useMutation({
     mutationFn: (payload: LoginPayload) => authService.login(payload),
     onSuccess: async (tokens) => {
-      setAccessToken(tokens.access_token, tokens.refresh_token);
+      setAccessToken(tokens.access_token);
       const user = await authService.getCurrentUser();
-      setSession(user, tokens.access_token, tokens.refresh_token);
+      setSession(user, tokens.access_token);
       queryClient.setQueryData(["auth", "me"], user);
     },
   });
 }
 
 export function useLogout() {
-  const refreshToken = useAuthStore((state) => state.refreshToken);
   const clearSession = useAuthStore((state) => state.clearSession);
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async () => {
-      if (refreshToken) {
-        await authService.logout(refreshToken).catch(() => undefined);
-      }
-    },
+    mutationFn: () => authService.logout().catch(() => undefined),
     onSettled: () => {
       clearSession();
       queryClient.clear();

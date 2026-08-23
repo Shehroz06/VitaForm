@@ -36,3 +36,7 @@ class BusinessRuleException(AppException):
 
 class ServiceUnavailableException(AppException):
     status_code = 503
+
+
+class RateLimitExceededException(AppException):
+    status_code = 429
