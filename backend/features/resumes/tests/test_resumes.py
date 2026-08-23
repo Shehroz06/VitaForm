@@ -172,7 +172,7 @@ async def test_autosaved_content_is_reflected_on_export_without_an_explicit_save
     assert export_response.status_code == 200
     file_data = export_response.json()["data"]
 
-    pdf_response = await client.get(file_data["url"])
+    pdf_response = await client.get(file_data["url"], headers=headers)
     with pymupdf.open(stream=pdf_response.content, filetype="pdf") as doc:
         text = doc[0].get_text()
     assert "MIT" in text
@@ -261,7 +261,7 @@ async def test_title_and_subtitle_overrides_render_without_touching_the_profile_
 
     export_response = await client.post(f"/api/v1/resumes/{resume_id}/export", headers=headers)
     assert export_response.status_code == 200
-    pdf_response = await client.get(export_response.json()["data"]["url"])
+    pdf_response = await client.get(export_response.json()["data"]["url"], headers=headers)
     with pymupdf.open(stream=pdf_response.content, filetype="pdf") as doc:
         text = doc[0].get_text()
 
@@ -338,7 +338,7 @@ async def test_export_resume_produces_downloadable_pdf(
     assert file_data["content_type"] == "application/pdf"
     assert file_data["size_bytes"] > 0
 
-    pdf_response = await client.get(file_data["url"])
+    pdf_response = await client.get(file_data["url"], headers=headers)
     assert pdf_response.status_code == 200
     assert pdf_response.headers["content-type"] == "application/pdf"
     assert pdf_response.content[:4] == b"%PDF"
@@ -904,7 +904,7 @@ async def test_export_resume_with_all_extended_section_types_renders_pdf(
     file_data = export_response.json()["data"]
     assert file_data["content_type"] == "application/pdf"
 
-    pdf_response = await client.get(file_data["url"])
+    pdf_response = await client.get(file_data["url"], headers=headers)
     assert pdf_response.status_code == 200
     assert pdf_response.content[:4] == b"%PDF"
 
@@ -927,7 +927,7 @@ async def test_re_exporting_replaces_the_previous_rendered_file(
 
     assert first_file_id != second_file_id
 
-    stale_lookup = await client.get(f"/api/v1/files/{first_file_id}")
+    stale_lookup = await client.get(f"/api/v1/files/{first_file_id}", headers=headers)
     assert stale_lookup.status_code == 404
 
 
@@ -998,7 +998,7 @@ async def test_export_resume_renders_for_every_template_with_custom_style(
         assert export_response.status_code == 200, f"{slug} failed to export"
         file_data = export_response.json()["data"]
 
-        pdf_response = await client.get(file_data["url"])
+        pdf_response = await client.get(file_data["url"], headers=headers)
         assert pdf_response.status_code == 200
         assert pdf_response.content[:4] == b"%PDF"
 
@@ -1068,7 +1068,7 @@ async def test_export_stays_legible_at_the_content_density_floor(
         assert export_response.status_code == 200, f"{slug} failed to export at density floor"
         file_data = export_response.json()["data"]
 
-        pdf_response = await client.get(file_data["url"])
+        pdf_response = await client.get(file_data["url"], headers=headers)
         with pymupdf.open(stream=pdf_response.content, filetype="pdf") as doc:
             assert doc.page_count == 1
             text = doc[0].get_text()

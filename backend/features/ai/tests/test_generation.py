@@ -92,7 +92,7 @@ async def test_generate_resume_happy_path(
     assert body["file"]["content_type"] == "application/pdf"
     assert body["file"]["size_bytes"] > 0
 
-    pdf_response = await client.get(body["file"]["url"])
+    pdf_response = await client.get(body["file"]["url"], headers=headers)
     assert pdf_response.status_code == 200
     assert pdf_response.content[:4] == b"%PDF"
 
@@ -349,7 +349,7 @@ async def test_generate_resume_trims_content_to_fit_one_page(
     assert response.status_code == 200
     body = response.json()["data"]
 
-    pdf_response = await client.get(body["file"]["url"])
+    pdf_response = await client.get(body["file"]["url"], headers=headers)
     with pymupdf.open(stream=pdf_response.content, filetype="pdf") as doc:
         assert doc.page_count == 1
 
@@ -421,7 +421,7 @@ async def test_generate_resume_still_deletes_items_when_condensing_is_not_enough
     assert response.status_code == 200
     body = response.json()["data"]
 
-    pdf_response = await client.get(body["file"]["url"])
+    pdf_response = await client.get(body["file"]["url"], headers=headers)
     with pymupdf.open(stream=pdf_response.content, filetype="pdf") as doc:
         assert doc.page_count == 1
 

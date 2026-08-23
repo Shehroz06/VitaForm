@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Response, UploadFile, status
 from fastapi import File as FileParam
 from fastapi.responses import RedirectResponse
 
+from app.core.http import content_disposition
 from app.core.storage import StorageProvider
 from app.exceptions.base import ResourceNotFoundException
 from app.schemas.response import SuccessResponse
@@ -52,14 +53,15 @@ async def delete_avatar(
 @router.get("/{file_id}")
 async def get_file(
     file_id: uuid.UUID,
+    profile: CurrentProfile,
     repository: FileRepositoryDep,
     storage: StorageProviderDep,
 ) -> Response:
-    """Publicly retrieves a file by its unguessable UUID (no auth required —
-    same trust model as a share-link). Redirects to a signed URL for S3-backed
-    storage; streams bytes directly for local disk storage."""
+    """Retrieves a file by id, scoped to the requesting profile's own files.
+    Redirects to a signed URL for S3-backed storage; streams bytes directly
+    for local disk storage."""
     entity = await repository.get_by_id(file_id)
-    if entity is None:
+    if entity is None or entity.profile_id != profile.id:
         raise ResourceNotFoundException("File not found.")
 
     signed_url = storage.get_signed_url(entity.storage_path)
@@ -67,7 +69,13 @@ async def get_file(
         return RedirectResponse(signed_url)
 
     content = await storage.read(entity.storage_path)
-    return Response(content=content, media_type=entity.content_type)
+    return Response(
+        content=content,
+        media_type=entity.content_type,
+        headers={
+            "Content-Disposition": content_disposition(entity.original_filename, "inline")
+        },
+    )
 
 
 @router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)

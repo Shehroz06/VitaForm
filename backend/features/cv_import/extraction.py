@@ -12,7 +12,7 @@ import pymupdf
 
 from app.exceptions.base import ValidationException
 
-_MAX_PDF_SIZE_MB = 10
+MAX_PDF_SIZE_MB = 10
 _RENDER_DPI = 150
 
 
@@ -28,8 +28,8 @@ def validate_pdf_upload(filename: str | None, content: bytes) -> None:
     if not content.startswith(b"%PDF"):
         raise ValidationException("The uploaded file is not a valid PDF.")
     size_mb = len(content) / (1024 * 1024)
-    if size_mb > _MAX_PDF_SIZE_MB:
-        raise ValidationException(f"PDF exceeds the {_MAX_PDF_SIZE_MB}MB import limit.")
+    if size_mb > MAX_PDF_SIZE_MB:
+        raise ValidationException(f"PDF exceeds the {MAX_PDF_SIZE_MB}MB import limit.")
 
 
 def extract_pages(pdf_bytes: bytes) -> list[ExtractedPage]:

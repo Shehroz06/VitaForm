@@ -17,7 +17,10 @@ class EmailSender(Protocol):
 
 class ConsoleEmailSender:
     """Dev-only sender that logs instead of delivering. Active when
-    EMAIL_PROVIDER=console (the default) -- no SMTP credentials required."""
+    EMAIL_PROVIDER=console (the default) -- no SMTP credentials required.
+    Verification/reset emails carry a raw bearer token in the body, so
+    get_email_sender() below refuses to hand this out in production --
+    logging it is only acceptable because that path is unreachable there."""
 
     async def send(self, to: str, subject: str, body: str) -> None:
         logger.info("EMAIL to=%s subject=%s\n%s", to, subject, body)
@@ -104,5 +107,10 @@ def get_email_sender(settings: Annotated[Settings, Depends(get_settings)]) -> Em
                 else settings.smtp_username
             ),
             from_name=settings.smtp_from_name,
+        )
+    if settings.environment == "production":
+        raise ValueError(
+            "EMAIL_PROVIDER=console is not allowed when ENVIRONMENT=production -- it logs "
+            "raw verification/reset tokens. Configure EMAIL_PROVIDER=smtp or gmail."
         )
     return ConsoleEmailSender()

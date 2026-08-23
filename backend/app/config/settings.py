@@ -1,6 +1,10 @@
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_INSECURE_JWT_SECRETS = frozenset({"change-me", "dev-secret-change-me", "secret", ""})
+_MIN_JWT_SECRET_LENGTH = 32
 
 
 class Settings(BaseSettings):
@@ -62,6 +66,18 @@ class Settings(BaseSettings):
     s3_endpoint_url: str | None = None
     s3_access_key_id: str | None = None
     s3_secret_access_key: str | None = None
+
+    @model_validator(mode="after")
+    def _reject_insecure_production_secrets(self) -> "Settings":
+        if self.environment == "production" and (
+            self.jwt_secret in _INSECURE_JWT_SECRETS
+            or len(self.jwt_secret) < _MIN_JWT_SECRET_LENGTH
+        ):
+            raise ValueError(
+                "JWT_SECRET must be set to a random value of at least "
+                f"{_MIN_JWT_SECRET_LENGTH} characters when ENVIRONMENT=production."
+            )
+        return self
 
 
 @lru_cache

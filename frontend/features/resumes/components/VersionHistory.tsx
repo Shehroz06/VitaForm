@@ -1,8 +1,10 @@
 "use client";
 
 import { Download, History } from "lucide-react";
+import { toast } from "sonner";
 import { useResumeVersions } from "@/features/resumes/hooks/use-resume-content";
 import { Button } from "@/components/ui/button";
+import { apiClient } from "@/services/api-client";
 
 export function VersionHistory({ resumeId }: { resumeId: string }) {
   const { data: versions, isLoading, isError } = useResumeVersions(resumeId);
@@ -32,14 +34,20 @@ export function VersionHistory({ resumeId }: { resumeId: string }) {
               </p>
             </div>
             {version.rendered_file_id && (
-              <Button variant="ghost" size="icon-sm" asChild aria-label="Download PDF">
-                <a
-                  href={`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1"}/files/${version.rendered_file_id}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <Download className="size-4" />
-                </a>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Download PDF"
+                onClick={() =>
+                  apiClient
+                    .downloadFile(
+                      `/files/${version.rendered_file_id}`,
+                      `resume-v${version.version_number}.pdf`,
+                    )
+                    .catch(() => toast.error("Failed to download PDF."))
+                }
+              >
+                <Download className="size-4" />
               </Button>
             )}
           </div>

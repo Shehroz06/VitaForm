@@ -81,7 +81,7 @@ async def test_replacing_avatar_removes_the_previous_file(
     )
     assert second.status_code == 201
 
-    stale_lookup = await client.get(f"/api/v1/files/{first_id}")
+    stale_lookup = await client.get(f"/api/v1/files/{first_id}", headers=headers)
     assert stale_lookup.status_code == 404
 
 
@@ -102,7 +102,7 @@ async def test_delete_avatar_clears_profile_avatar_url(
     assert profile_response.json()["data"]["avatar_url"] is None
 
 
-async def test_uploaded_file_is_publicly_retrievable_with_correct_bytes(
+async def test_uploaded_file_is_retrievable_by_its_owner_with_correct_bytes(
     client: AsyncClient, captured_emails: list[dict[str, str]]
 ) -> None:
     headers = await _auth(client, captured_emails, "filesRetrieve1@example.com")
@@ -113,15 +113,52 @@ async def test_uploaded_file_is_publicly_retrievable_with_correct_bytes(
     )
     file_id = upload.json()["data"]["id"]
 
-    retrieve_response = await client.get(f"/api/v1/files/{file_id}")
+    retrieve_response = await client.get(f"/api/v1/files/{file_id}", headers=headers)
 
     assert retrieve_response.status_code == 200
     assert retrieve_response.content == _PNG_CONTENT
     assert retrieve_response.headers["content-type"] == "image/png"
 
 
-async def test_retrieve_nonexistent_file_returns_404(client: AsyncClient) -> None:
-    response = await client.get("/api/v1/files/00000000-0000-0000-0000-000000000000")
+async def test_retrieve_file_without_auth_is_rejected(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "filesRetrieveNoAuth@example.com")
+    upload = await client.post(
+        "/api/v1/files/avatar",
+        headers=headers,
+        files={"file": ("avatar.png", _PNG_CONTENT, "image/png")},
+    )
+    file_id = upload.json()["data"]["id"]
+
+    response = await client.get(f"/api/v1/files/{file_id}")
+    assert response.status_code == 401
+
+
+async def test_retrieve_nonexistent_file_returns_404(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(client, captured_emails, "filesRetrieveMissing@example.com")
+    response = await client.get(
+        "/api/v1/files/00000000-0000-0000-0000-000000000000", headers=headers
+    )
+    assert response.status_code == 404
+
+
+async def test_users_cannot_retrieve_each_others_files(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers_a = await _auth(client, captured_emails, "filesRetrieveIsoA@example.com")
+    headers_b = await _auth(client, captured_emails, "filesRetrieveIsoB@example.com")
+
+    upload = await client.post(
+        "/api/v1/files/avatar",
+        headers=headers_a,
+        files={"file": ("avatar.png", _PNG_CONTENT, "image/png")},
+    )
+    file_id = upload.json()["data"]["id"]
+
+    response = await client.get(f"/api/v1/files/{file_id}", headers=headers_b)
     assert response.status_code == 404
 
 
@@ -162,7 +199,7 @@ async def test_certification_attachment_upload_and_delete_flow(
     file_id = upload_response.json()["data"]["file_id"]
     assert file_id is not None
 
-    retrieve_response = await client.get(f"/api/v1/files/{file_id}")
+    retrieve_response = await client.get(f"/api/v1/files/{file_id}", headers=headers)
     assert retrieve_response.status_code == 200
     assert retrieve_response.content == _PDF_CONTENT
 
@@ -176,7 +213,7 @@ async def test_certification_attachment_upload_and_delete_flow(
     )
     assert get_response.json()["data"]["file_id"] is None
 
-    stale_lookup = await client.get(f"/api/v1/files/{file_id}")
+    stale_lookup = await client.get(f"/api/v1/files/{file_id}", headers=headers)
     assert stale_lookup.status_code == 404
 
 

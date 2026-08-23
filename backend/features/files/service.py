@@ -5,10 +5,11 @@ from fastapi import UploadFile
 from app.config.settings import Settings
 from app.core.enums import FilePurpose
 from app.core.storage import StorageProvider
+from app.core.uploads import read_upload_capped
 from app.exceptions.base import ResourceNotFoundException
 from features.files.models import File
 from features.files.repository import FileRepository
-from features.files.validation import validate_upload
+from features.files.validation import max_size_bytes_for, validate_upload
 from features.profiles.models import Profile
 from features.profiles.repository import ProfileRepository
 
@@ -31,7 +32,12 @@ class FileUploadService:
     async def upload(
         self, profile_id: uuid.UUID, purpose: FilePurpose, upload_file: UploadFile
     ) -> File:
-        content = await upload_file.read()
+        max_bytes = max_size_bytes_for(purpose, self._settings)
+        content = await read_upload_capped(
+            upload_file,
+            max_bytes,
+            f"File exceeds the maximum size of {max_bytes // (1024 * 1024)}MB.",
+        )
         extension = validate_upload(
             purpose, upload_file.filename, upload_file.content_type, len(content), self._settings
         )

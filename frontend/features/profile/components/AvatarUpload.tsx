@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useRemoveAvatar, useUploadAvatar } from "@/features/profile/hooks/use-avatar";
 import type { Profile } from "@/features/profile/types";
+import { useAuthenticatedFileUrl } from "@/hooks/use-authenticated-file-url";
 import { ApiError } from "@/services/api-client";
 
 const MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024;
@@ -16,6 +17,7 @@ export function AvatarUpload({ profile }: { profile: Profile }) {
   const uploadAvatar = useUploadAvatar();
   const removeAvatar = useRemoveAvatar();
   const isPending = uploadAvatar.isPending || removeAvatar.isPending;
+  const avatarSrc = useAuthenticatedFileUrl(profile.avatar_url);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -51,13 +53,9 @@ export function AvatarUpload({ profile }: { profile: Profile }) {
   return (
     <div className="flex items-center gap-4">
       <div className="flex size-16 items-center justify-center overflow-hidden rounded-full border bg-muted">
-        {profile.avatar_url ? (
+        {avatarSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={profile.avatar_url}
-            alt="Avatar"
-            className="size-full object-cover"
-          />
+          <img src={avatarSrc} alt="Avatar" className="size-full object-cover" />
         ) : (
           <User className="size-6 text-muted-foreground" />
         )}

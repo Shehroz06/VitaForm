@@ -30,6 +30,12 @@ def _rules_for(purpose: FilePurpose, settings: Settings) -> _UploadRules:
     )
 
 
+def max_size_bytes_for(purpose: FilePurpose, settings: Settings) -> int:
+    """Exposed separately from validate_upload so callers can cap the read
+    itself, before the file's declared size is even known."""
+    return _rules_for(purpose, settings).max_size_bytes
+
+
 def validate_upload(
     purpose: FilePurpose,
     filename: str | None,

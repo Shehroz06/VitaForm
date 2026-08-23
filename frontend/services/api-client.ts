@@ -152,4 +152,23 @@ export const apiClient = {
     link.remove();
     URL.revokeObjectURL(url);
   },
+  // Fetches an authenticated binary response and opens it in a new tab --
+  // preserves the "view in browser" UX a plain <a target="_blank"> would
+  // give, which isn't otherwise possible since the browser can't attach the
+  // Authorization header itself to a bare navigation.
+  openInNewTab: async (path: string): Promise<void> => {
+    const { blob } = await requestBlob(path, { method: "GET" });
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank", "noopener,noreferrer");
+    // Revoke after a delay long enough for the new tab to load the resource;
+    // an immediate revoke can race the tab's own fetch of the blob: URL.
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  },
+  // Fetches an authenticated binary response as a raw Blob, for callers that
+  // display the bytes themselves (e.g. rendering an <img> from an object
+  // URL) rather than triggering a download or a new-tab view.
+  fetchBlob: async (path: string): Promise<Blob> => {
+    const { blob } = await requestBlob(path, { method: "GET" });
+    return blob;
+  },
 };

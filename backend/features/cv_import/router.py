@@ -4,9 +4,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, UploadFile, status
 from fastapi import File as FileParam
 
+from app.core.uploads import read_upload_capped
 from app.schemas.pagination import PaginationParams, build_pagination_meta, get_pagination
 from app.schemas.response import SuccessResponse
 from features.cv_import.dependencies import get_import_service
+from features.cv_import.extraction import MAX_PDF_SIZE_MB
 from features.cv_import.schemas import (
     ImportConfirmRequest,
     ImportConfirmResultResponse,
@@ -30,7 +32,11 @@ async def create_import_session(
     service: ImportServiceDep,
     file: Annotated[UploadFile, FileParam()],
 ) -> SuccessResponse[ImportSessionResponse]:
-    content = await file.read()
+    content = await read_upload_capped(
+        file,
+        MAX_PDF_SIZE_MB * 1024 * 1024,
+        f"PDF exceeds the {MAX_PDF_SIZE_MB}MB import limit.",
+    )
     session = await service.create_session(profile, file.filename, content)
     return SuccessResponse(
         message="CV parsed. Review the proposed data before confirming.",

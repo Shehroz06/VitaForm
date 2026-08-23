@@ -26,7 +26,7 @@ import {
 } from "@/features/profile/hooks/use-certifications";
 import { type CertificationFormValues, certificationSchema } from "@/features/profile/schemas";
 import type { Certification } from "@/features/profile/types";
-import { ApiError } from "@/services/api-client";
+import { apiClient, ApiError } from "@/services/api-client";
 
 const MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_ATTACHMENT_TYPES = new Set(["image/jpeg", "image/png", "application/pdf"]);
@@ -167,14 +167,17 @@ function CertificationAttachment({ item }: { item: Certification }) {
       {item.file_id ? (
         <>
           <Paperclip className="size-4 text-muted-foreground" />
-          <a
-            href={`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1"}/files/${item.file_id}`}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            type="button"
             className="text-primary underline"
+            onClick={() =>
+              apiClient
+                .openInNewTab(`/files/${item.file_id}`)
+                .catch(() => toast.error("Failed to open attachment."))
+            }
           >
             View attachment
-          </a>
+          </button>
           <Button
             type="button"
             variant="ghost"
