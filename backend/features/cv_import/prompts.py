@@ -33,6 +33,10 @@ date, not a skill. If a value is not stated, omit that field (or the whole \
 item, if a required field is missing).
 - Dates must be ISO format YYYY-MM-DD. If only a month and year are given, use \
 day 01. If only a year is given, use January 1 of that year.
+- Any URL field (e.g. repository_url, demo_url, linkedin_url) must be a full URL \
+starting with "https://". If the source text shows a bare domain/path (e.g. \
+"github.com/user/repo" or "linkedin.com/in/user"), prepend "https://" -- do not \
+omit the field just because the scheme was missing in the source.
 - Every item you output must go under the correct section key from the schema \
 below -- do not invent new section keys.
 - "bio" is the only field where you may write connective prose, and only by \

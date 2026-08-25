@@ -1,30 +1,74 @@
-# AI Career Platform
+# VitraForm
 
-A career operating system: one structured profile, from which the AI generates real, exportable
-career documents (a job-targeted CV/resume, a cover letter, LinkedIn "About" text) on demand. The
-database is always the source of truth — the AI only selects and arranges real profile data and
-writes connective prose; it never invents experience, projects, or achievements that aren't there.
-The profile can also be bootstrapped by uploading an existing CV as a PDF — the app extracts and
-classifies the content, but nothing is written until you review and confirm it.
+**A career operating system, not a resume builder.**
 
-Backend: FastAPI + SQLAlchemy (async) + Alembic + PostgreSQL.
-Frontend: Next.js (App Router) + TypeScript + Tailwind + shadcn/ui.
-AI: provider-agnostic (Gemini, Groq, OpenRouter, OpenAI, Anthropic — swap via config, not code).
+Build one structured profile — your education, experience, projects, skills, and everything
+else you've done — and let AI generate the specific document a moment calls for: a
+job-targeted resume, a cover letter, a LinkedIn "About" section. On demand, reproducibly,
+without ever retyping your career from scratch.
+
+## The idea
+
+Most tools ask you to write a resume, then another resume for the next job, then a cover
+letter, then rewrite your LinkedIn bio — the same facts, retyped over and over, drifting out
+of sync every time.
+
+VitraForm inverts that. **Your profile is permanent. Documents are temporary, generated
+output.** Add an experience once; it's available to every resume, cover letter, and bio you
+generate afterward, tailored differently each time to fit the job description in front of you.
+
+The database is always the source of truth — the AI only selects, ranks, and arranges facts
+that are actually in your profile, and writes the connective prose around them. It never
+invents an experience, a project, or a skill you didn't add. If something's missing, the
+output leaves it out rather than making it up.
+
+You can also bootstrap a profile by uploading an existing resume as a PDF — the AI extracts
+and classifies what it finds, but nothing is written until you've reviewed and confirmed it.
+
+## Features
+
+**Structured profile** — education, experience, projects, skills, certifications,
+achievements, awards, research, patents, hackathons, competitions, volunteer work, leadership
+roles, organizations, languages, references, interests, and a portfolio. Every section has
+full CRUD, independent of any document.
+
+**AI-generated documents** — a job-targeted resume (with version history and one-page
+autofit), a cover letter, and a LinkedIn "About" section, each built from your real profile
+data and a job description you provide.
+
+**CV import** — upload a PDF resume; the AI reads it (text and layout) and proposes
+structured profile entries for you to review, edit, and accept individually. Nothing saves
+without your confirmation.
+
+**Job tracking & ATS scoring** — save job descriptions, get an AI fit analysis, and score a
+generated resume against a job posting's likely ATS keyword matching.
+
+**Provider-agnostic AI** — Gemini, Groq, OpenRouter, OpenAI, or Anthropic, swappable via a
+single config value. Automatic fallback if your primary provider is unavailable.
+
+**PDF export** — resumes render to real, downloadable PDFs from multiple templates.
+
+## Tech stack
+
+| Layer | Stack |
+|---|---|
+| Backend | FastAPI, SQLAlchemy (async), Alembic, PostgreSQL |
+| Frontend | Next.js (App Router), TypeScript, Tailwind, shadcn/ui, TanStack Query |
+| AI | Gemini / Groq / OpenRouter / OpenAI / Anthropic — provider-agnostic |
+| Auth | JWT access tokens + HttpOnly refresh cookie, Argon2 password hashing |
+| Storage | Local disk (dev) or S3-compatible object storage (production) |
 
 ---
 
-## Prerequisites
+## Getting started
 
-- Docker + Docker Compose (the only hard requirement for local development)
-- For running backend tooling outside a container: Python 3.13 and [`uv`](https://docs.astral.sh/uv/)
-- For running frontend tooling outside a container: Node 22+
-
-## Quick start
+**Prerequisites:** Docker + Docker Compose. (For running tooling outside a container: Python
+3.13 + [`uv`](https://docs.astral.sh/uv/) for the backend, Node 22+ for the frontend.)
 
 ```bash
 # 1. Backend environment
 cp backend/.env.example backend/.env
-# then fill in at least one AI provider key (see "AI providers" below) — everything
+# then set at least one AI provider key (see "AI providers" below) — everything
 # else has a working default.
 
 # 2. Frontend environment
@@ -37,78 +81,33 @@ docker compose -f docker/docker-compose.yml up -d --build
 cd backend && uv run alembic upgrade head
 ```
 
+- Frontend: http://localhost:3000
 - Backend: http://localhost:8000 (`GET /api/v1/health` should return `{"success": true, ...}`)
 - API docs: http://localhost:8000/docs
-- Frontend: http://localhost:3000
 
 Tear down with `docker compose -f docker/docker-compose.yml down` (add `-v` to also drop the
-Postgres volume — only do this if you actually want a clean database).
+Postgres volume).
 
-## Environment variables
+### AI providers
 
-All settings live in `backend/.env` (see `backend/.env.example` for the full list with defaults)
-and `frontend/.env` (`NEXT_PUBLIC_API_URL`, pointing at the backend).
+At least one is needed for resume/cover-letter/LinkedIn generation and CV import; everything
+else (profile CRUD, manual resume export, job/ATS analysis) works without any AI key.
 
-**Required to do anything useful:**
-- `DATABASE_URL`, `REDIS_URL` — already correct for the Docker Compose setup, no changes needed.
-- `JWT_SECRET` — change this to a real secret before anything beyond local development.
-
-**AI providers** (`backend/.env`) — at least one is needed for resume/cover-letter/LinkedIn
-generation to work; everything else in the app (profile CRUD, manual resume export, job/ATS
-analysis) works without any AI key configured:
 - `AI_DEFAULT_PROVIDER` picks the primary provider; `AI_FALLBACK_PROVIDERS` is an ordered list
-  tried if the default fails or isn't configured (e.g. `["groq","openrouter"]`).
+  tried if the default fails or isn't configured.
 - Supported: `gemini`, `groq`, `openrouter`, `openai`, `anthropic`. Set the matching
-  `<PROVIDER>_API_KEY` for whichever you use. Gemini's free tier
-  (https://aistudio.google.com/apikey) and Groq's free tier (https://console.groq.com/keys) are
-  both good, zero-cost defaults to start with.
+  `<PROVIDER>_API_KEY`. Gemini's free tier (https://aistudio.google.com/apikey) and Groq's
+  free tier (https://console.groq.com/keys) are both good, zero-cost starting points.
 - Switching providers is a config change only — no code changes required.
 
-**Email (OTP / verification / password reset):**
-- `EMAIL_PROVIDER=console` (default) — verification/reset emails are logged to the backend
-  container's stdout instead of being sent. Fine for local development: run
-  `docker compose -f docker/docker-compose.yml logs -f backend` and copy the token/link from the
-  log line after triggering registration or "forgot password".
-- `EMAIL_PROVIDER=smtp` — sends real email via SMTP. Set `SMTP_HOST`, `SMTP_PORT`,
-  `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_ADDRESS`, `SMTP_FROM_NAME`. Works with any SMTP
-  endpoint — a relay, or the SMTP interface of a transactional provider (SendGrid, Mailgun, AWS
-  SES, Resend, Postmark, etc.). Whichever provider you pick, use their SMTP credentials, not an
-  API-only integration.
+### Email (OTP / verification / password reset)
 
-**Storage:** `STORAGE_PROVIDER=local` (default, writes under `backend/storage/local/`) or `s3`
-(set the `S3_*` variables — a real S3-compatible implementation exists but is unexercised without
-real bucket credentials).
+- `EMAIL_PROVIDER=console` (default) — emails are logged to the backend container's stdout
+  instead of being sent. Fine for local development.
+- `EMAIL_PROVIDER=smtp` — sends real email via any SMTP endpoint (a relay, or a transactional
+  provider's SMTP interface — SendGrid, Mailgun, SES, Resend, Postmark, etc).
 
-## Running backend checks
-
-```bash
-cd backend
-uv run ruff check --fix .      # lint
-uv run mypy .                  # type check
-uv run pytest -q               # full test suite
-```
-
-## Running frontend checks
-
-```bash
-cd frontend
-npx tsc --noEmit                # type check
-npm run lint                    # eslint
-npm run build                   # production build (also catches issues npx tsc alone won't)
-```
-
-## Database migrations
-
-```bash
-cd backend
-uv run alembic upgrade head        # apply all pending migrations
-uv run alembic downgrade -1        # roll back the most recent migration
-uv run alembic current             # show the currently applied revision
-uv run alembic revision --autogenerate -m "describe the change"   # after editing models
-```
-
-Every migration in this repo is written to be reversible (`upgrade`/`downgrade` both work,
-including Postgres ENUM types, which don't autogenerate a clean rollback by default).
+---
 
 ## Project layout
 
@@ -117,7 +116,7 @@ backend/
   app/            framework-level code: config, DB session, core abstractions (AI provider
                    interface, storage interface, CRUD base classes), auth/permission dependencies
   features/       one folder per domain (profiles, education, experience, resumes, ai, jobs,
-                   companion, etc.) — each owns its models/schemas/repository/service/router/tests
+                   companion, cv_import, etc.) — each owns its models/schemas/repository/service/router
   alembic/         migrations
   templates/       Jinja2 templates rendered to PDF (resumes)
 frontend/
@@ -126,13 +125,12 @@ frontend/
 docker/           docker-compose.yml + Dockerfiles
 ```
 
-## Troubleshooting
+## Roadmap
 
-- **Port already in use (5432/6379/8000/3000):** something else on the machine is bound to that
-  port. Check with `ss -ltnp` and stop the conflicting process, or change the host-side port
-  mapping in `docker/docker-compose.yml`.
-- **Docker commands hang / can't connect to the daemon:** confirm the active Docker context is the
-  one with a running engine — `docker context ls`, then `docker context use <name>`.
-- **Frontend changes to a mutation inside a `Suspense` boundary don't appear to re-render:** a
-  known `next dev`/Turbopack-only defect. Verify with a production build
-  (`npm run build && npm run start -- -p 3000`) before concluding it's a real bug.
+AI interview coaching, application tracking, public portfolio pages, a recruiter dashboard,
+university/scholarship application support, career analytics, and a plugin system are on the
+long-term roadmap.
+
+## License
+
+Educational use — see [LICENSE](LICENSE).

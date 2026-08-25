@@ -83,7 +83,7 @@ import type {
   SectionType,
 } from "@/features/resumes/types";
 import { cn } from "@/lib/utils";
-import { ApiError } from "@/services/api-client";
+import { ApiError, apiClient } from "@/services/api-client";
 
 interface BuilderState {
   summary: string;
@@ -498,7 +498,12 @@ function ResumeBuilderForm({
     exportResume.mutate(undefined, {
       onSuccess: (file) => {
         toast.success("Resume exported.");
-        window.open(file.url, "_blank", "noopener,noreferrer");
+        // file.url is the raw API URL, which requires an Authorization
+        // header a plain browser navigation can't carry -- fetch it
+        // ourselves (authenticated) and open the resulting blob instead.
+        apiClient
+          .openInNewTab(`/files/${file.id}`)
+          .catch(() => toast.error("Exported, but failed to open the PDF."));
       },
       onError: (error) => {
         toast.error(error instanceof ApiError ? error.message : "Failed to export resume.");

@@ -1,8 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cvImportService } from "@/features/cv-import/services/cv-import-service";
 import type { ImportConfirmPayload } from "@/features/cv-import/types";
+import { PROFILE_QUERY_KEY } from "@/features/profile/hooks/use-crud-resource";
 
 const SESSIONS_KEY = ["cv-import-sessions"];
+// Confirming an import can create rows in any of these resources depending
+// on what the CV contained -- invalidate them all rather than tracking
+// exactly which ones a given session touched.
+const IMPORTABLE_RESOURCE_KEYS = [
+  ["education"],
+  ["experience"],
+  ["projects"],
+  ["skills"],
+  PROFILE_QUERY_KEY,
+];
 
 export function useImportSession(id: string) {
   return useQuery({
@@ -26,6 +37,9 @@ export function useConfirmImportSession(id: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SESSIONS_KEY });
       queryClient.invalidateQueries({ queryKey: [...SESSIONS_KEY, id] });
+      for (const queryKey of IMPORTABLE_RESOURCE_KEYS) {
+        queryClient.invalidateQueries({ queryKey });
+      }
     },
   });
 }

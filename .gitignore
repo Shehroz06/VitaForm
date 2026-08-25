@@ -42,8 +42,15 @@ Thumbs.db
 .idea/
 .claude/
 
-# --- Internal planning docs (not tracked in git) ---
+# --- Internal planning docs ---
 .ai/
+CLAUDE.md
+frontend/CLAUDE.md
+AGENTS.md
+frontend/AGENTS.md
+
+# --- CI / coding-agent workflows ---
+.github/
 
 # --- Logs ---
 *.log
