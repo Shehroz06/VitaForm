@@ -1,19 +1,75 @@
 "use client";
 
-import { ChevronDown, Sparkles } from "lucide-react";
+import { ChevronDown, Loader2, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { TemplateMockup } from "@/components/marketing/TemplateMockup";
-import { useGenerateResume, useResumeTemplates } from "@/features/resumes/hooks/use-resumes";
-import { TEMPLATE_REGISTRY, TEMPLATE_SLUGS } from "@/features/resumes/templates/registry";
+import {
+  useGenerateResume,
+  useResumeTemplates,
+  useTemplateSamplePreview,
+} from "@/features/resumes/hooks/use-resumes";
+import { TEMPLATE_REGISTRY, TEMPLATE_SLUGS, getTemplateDefinition } from "@/features/resumes/templates/registry";
 import { ACCENT_OPTIONS } from "@/features/resumes/templates/style-options";
+import { configToStyle } from "@/features/resumes/style-mapping";
 import { ApiError } from "@/services/api-client";
 import { cn } from "@/lib/utils";
+
+/** Real backend render of the template filled with the caller's own
+ * profile -- same source of truth as the standalone /templates page, so
+ * the picker never shows a look the actual PDF export won't match. */
+function TemplateThumbnail({
+  templateId,
+  slug,
+  accent,
+  enabled,
+}: {
+  templateId: string;
+  slug: string;
+  accent: string;
+  enabled: boolean;
+}) {
+  const style = configToStyle({ ...getTemplateDefinition(slug).defaultConfig, accentColor: accent });
+  const { data, isFetching, isError } = useTemplateSamplePreview(templateId, style, enabled);
+
+  const imageUrl = useMemo(() => {
+    if (!data) return null;
+    try {
+      return URL.createObjectURL(data.blob);
+    } catch {
+      return null;
+    }
+  }, [data]);
+
+  useEffect(() => {
+    return () => {
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
+    };
+  }, [imageUrl]);
+
+  return (
+    <div className="relative aspect-[210/297] w-full overflow-hidden rounded-lg bg-white">
+      {imageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element -- fetched, authenticated blob URL, not a static asset
+        <img src={imageUrl} alt="" className="h-full w-full object-cover object-top" />
+      )}
+      {!imageUrl && isFetching && (
+        <div className="flex h-full w-full items-center justify-center">
+          <Loader2 className="size-4 animate-spin text-neutral-400" />
+        </div>
+      )}
+      {!imageUrl && isError && (
+        <div className="flex h-full w-full items-center justify-center p-2 text-center text-[10px] text-neutral-500">
+          Preview failed
+        </div>
+      )}
+    </div>
+  );
+}
 
 const MIN_JOB_DESCRIPTION_LENGTH = 50;
 
@@ -189,10 +245,16 @@ export function GenerateResumeForm({
                   )}
                 >
                   <div className="overflow-hidden rounded-lg bg-neutral-100">
-                    <TemplateMockup
-                      slug={slug}
-                      accent={accentColor ?? definition.defaultConfig.accentColor}
-                    />
+                    {template ? (
+                      <TemplateThumbnail
+                        templateId={template.id}
+                        slug={slug}
+                        accent={accentColor ?? definition.defaultConfig.accentColor}
+                        enabled={showTemplate}
+                      />
+                    ) : (
+                      <div className="aspect-[210/297] w-full" />
+                    )}
                   </div>
                   <p className="truncate px-0.5 text-xs font-medium text-foreground">
                     {definition.name}

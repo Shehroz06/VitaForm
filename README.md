@@ -1,7 +1,5 @@
 # VitraForm
 
-**A career operating system, not a resume builder.**
-
 Build one structured profile — your education, experience, projects, skills, and everything
 else you've done — and let AI generate the specific document a moment calls for: a
 job-targeted resume, a cover letter, a LinkedIn "About" section. On demand, reproducibly,
@@ -52,11 +50,10 @@ single config value. Automatic fallback if your primary provider is unavailable.
 
 | Layer | Stack |
 |---|---|
-| Backend | FastAPI, SQLAlchemy (async), Alembic, PostgreSQL |
-| Frontend | Next.js (App Router), TypeScript, Tailwind, shadcn/ui, TanStack Query |
+| Backend | FastAPI, SQLAlchemy, Alembic, PostgreSQL |
+| Frontend | Next.js , TypeScript, Tailwind, shadcn/ui, TanStack Query |
 | AI | Gemini / Groq / OpenRouter / OpenAI / Anthropic — provider-agnostic |
 | Auth | JWT access tokens + HttpOnly refresh cookie, Argon2 password hashing |
-| Storage | Local disk (dev) or S3-compatible object storage (production) |
 
 ---
 
