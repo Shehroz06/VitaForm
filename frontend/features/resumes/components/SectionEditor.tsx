@@ -2,10 +2,28 @@
 
 import { useState } from "react";
 import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
   ChevronDown,
   ChevronUp,
   Eye,
   EyeOff,
+  GripVertical,
   Loader2,
   Pencil,
   Plus,
@@ -118,41 +136,42 @@ function SectionCardShell({
   );
 }
 
-/** One selected item: reorder within the section, remove it, and -- for
- * section types with a sub-heading (see ITEM_EDITABLE_SECTIONS) -- edit its
- * title/org/description for this resume only, with an AI rephrase option
- * for the description. Collapsed by default so a section with several
- * entries doesn't turn into a wall of textareas. */
+/** One selected item: drag to reorder within the section (grip handle also
+ * works from the keyboard -- Tab to it, Space to pick up, Arrow keys to
+ * move, Space to drop), remove it, and -- for section types with a
+ * sub-heading (see ITEM_EDITABLE_SECTIONS) -- edit its title/org/description
+ * for this resume only, with an AI rephrase option for the description.
+ * Collapsed by default so a section with several entries doesn't turn into
+ * a wall of textareas. */
 function ItemRow({
   item,
   editable,
-  isFirst,
-  isLast,
   resumeId,
   titleOverride,
   subtitleOverride,
   descriptionOverride,
-  onMoveUp,
-  onMoveDown,
   onRemove,
   onOverrideChange,
 }: {
   item: ResumePreviewItem;
   editable: boolean;
-  isFirst: boolean;
-  isLast: boolean;
   resumeId: string;
   titleOverride: string | undefined;
   subtitleOverride: string | undefined;
   descriptionOverride: string | undefined;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
   onRemove: () => void;
   onOverrideChange: (field: "title" | "subtitle" | "description", value: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const rewrite = useRewriteResumeText(resumeId);
   const effectiveDescription = descriptionOverride ?? item.description ?? "";
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   const handleRephrase = () => {
     if (!effectiveDescription.trim()) {
@@ -176,28 +195,24 @@ function ItemRow({
   };
 
   return (
-    <div className="rounded-lg border border-border">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "rounded-lg border border-border bg-card",
+        isDragging && "z-10 opacity-90 shadow-md",
+      )}
+    >
       <div className="flex items-center gap-2 px-2.5 py-2">
-        <div className="flex shrink-0 flex-col">
-          <button
-            type="button"
-            onClick={onMoveUp}
-            disabled={isFirst}
-            className="flex size-4 items-center justify-center text-muted-foreground transition-colors hover:text-foreground disabled:opacity-25"
-            aria-label="Move up"
-          >
-            <ChevronUp className="size-3" />
-          </button>
-          <button
-            type="button"
-            onClick={onMoveDown}
-            disabled={isLast}
-            className="flex size-4 items-center justify-center text-muted-foreground transition-colors hover:text-foreground disabled:opacity-25"
-            aria-label="Move down"
-          >
-            <ChevronDown className="size-3" />
-          </button>
-        </div>
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="flex size-6 shrink-0 cursor-grab touch-none items-center justify-center text-muted-foreground transition-colors hover:text-foreground active:cursor-grabbing"
+          aria-label="Drag to reorder"
+        >
+          <GripVertical className="size-4" />
+        </button>
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-foreground">
@@ -285,6 +300,9 @@ function ItemRow({
               placeholder="No description on your profile yet."
               className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Wrap a phrase in **double asterisks** to render it bold.
+            </p>
           </div>
         </div>
       )}
@@ -328,6 +346,10 @@ export function SectionEditor({
   onOverrideChange: (field: "title" | "subtitle" | "description", itemId: string, value: string) => void;
 }) {
   const [query, setQuery] = useState("");
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const byId = new Map(items.map((item) => [item.id, item]));
   const selectedItems = section.item_ids
@@ -343,12 +365,13 @@ export function SectionEditor({
     onChange({ ...section, item_ids: section.item_ids.filter((id) => id !== itemId) });
   };
 
-  const moveItem = (index: number, direction: -1 | 1) => {
-    const target = index + direction;
-    if (target < 0 || target >= section.item_ids.length) return;
-    const item_ids = [...section.item_ids];
-    [item_ids[index], item_ids[target]] = [item_ids[target], item_ids[index]];
-    onChange({ ...section, item_ids });
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = section.item_ids.indexOf(String(active.id));
+    const newIndex = section.item_ids.indexOf(String(over.id));
+    if (oldIndex === -1 || newIndex === -1) return;
+    onChange({ ...section, item_ids: arrayMove(section.item_ids, oldIndex, newIndex) });
   };
 
   const filtered = query
@@ -383,25 +406,32 @@ export function SectionEditor({
       ) : (
         <>
           {selectedItems.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              {selectedItems.map((item, index) => (
-                <ItemRow
-                  key={item.id}
-                  item={item}
-                  editable={editable}
-                  isFirst={index === 0}
-                  isLast={index === selectedItems.length - 1}
-                  resumeId={resumeId}
-                  titleOverride={titleOverrides[item.id]}
-                  subtitleOverride={subtitleOverrides[item.id]}
-                  descriptionOverride={descriptionOverrides[item.id]}
-                  onMoveUp={() => moveItem(index, -1)}
-                  onMoveDown={() => moveItem(index, 1)}
-                  onRemove={() => removeItem(item.id)}
-                  onOverrideChange={(field, value) => onOverrideChange(field, item.id, value)}
-                />
-              ))}
-            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={selectedItems.map((item) => item.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="flex flex-col gap-1.5">
+                  {selectedItems.map((item) => (
+                    <ItemRow
+                      key={item.id}
+                      item={item}
+                      editable={editable}
+                      resumeId={resumeId}
+                      titleOverride={titleOverrides[item.id]}
+                      subtitleOverride={subtitleOverrides[item.id]}
+                      descriptionOverride={descriptionOverrides[item.id]}
+                      onRemove={() => removeItem(item.id)}
+                      onOverrideChange={(field, value) => onOverrideChange(field, item.id, value)}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           )}
 
           {unselectedItems.length > 0 && (
