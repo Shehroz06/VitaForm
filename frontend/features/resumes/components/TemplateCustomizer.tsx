@@ -3,6 +3,7 @@
 import { Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ACCENT_OPTIONS, FONT_OPTIONS } from "@/features/resumes/templates/style-options";
 import type { TemplateConfig, TemplateSpacing } from "@/features/resumes/templates/types";
@@ -89,6 +90,20 @@ export function TemplateCustomizer({
             </TabsList>
           </Tabs>
         </div>
+
+        <label className="flex items-center justify-between gap-2">
+          <span className="flex flex-col">
+            <span className="text-xs font-medium text-muted-foreground">Bold keywords</span>
+            <span className="text-[11px] text-muted-foreground/80">
+              Render **bold** markup in descriptions
+            </span>
+          </span>
+          <Switch
+            checked={config.boldMarkup ?? true}
+            onCheckedChange={(checked) => onChange({ boldMarkup: checked })}
+            aria-label="Bold keyword markup"
+          />
+        </label>
 
         <Button
           variant="ghost"

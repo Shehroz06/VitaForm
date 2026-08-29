@@ -57,6 +57,9 @@ export interface ResumeStyle {
   // trim loop when spacing presets alone don't make content fit -- never a
   // manual choice in the customizer.
   content_density: number;
+  // When false, **bold** markers a user typed into a description or the
+  // summary render as plain text instead of bold. Toggled in the customizer.
+  bold_markup: boolean;
 }
 
 export interface ResumeContent {

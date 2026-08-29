@@ -100,7 +100,7 @@
 \BLOCK{for item in section.entries}
 \resumeEntryHeading
   {\VAR{item.title | latex_escape}\BLOCK{if item.role} \textperiodcentered\ \textit{\small \VAR{item.role | latex_escape}}\BLOCK{endif}}
-  {\small \BLOCK{if item.repository_url}\href{\VAR{item.repository_url | latex_safe_url}}{GitHub}\BLOCK{endif}\BLOCK{if item.repository_url and item.demo_url} \textperiodcentered\ \BLOCK{endif}\BLOCK{if item.demo_url}\href{\VAR{item.demo_url | latex_safe_url}}{Live}\BLOCK{endif}\normalsize}
+  {\small \BLOCK{if item.repository_url}\href{\VAR{item.repository_url | latex_safe_url}}{\textbf{GitHub}}\BLOCK{endif}\BLOCK{if item.repository_url and item.demo_url} \textperiodcentered\ \BLOCK{endif}\BLOCK{if item.demo_url}\href{\VAR{item.demo_url | latex_safe_url}}{\textbf{Live}}\BLOCK{endif}\normalsize}
 \BLOCK{if item.description}\VAR{item.description | format_description}\BLOCK{endif}
 \BLOCK{if item.skills}\small\textit{\VAR{item.skills | map(attribute="name") | map("latex_escape") | join(", ")}}\normalsize\\
 \BLOCK{endif}
@@ -120,21 +120,21 @@
 
 \BLOCK{elif section.type == "achievements"}
 \section*{\VAR{section.title | latex_escape}}
+\begin{itemize}[leftmargin=*,itemsep=0pt,topsep=2pt]
 \BLOCK{for item in section.entries}
-\resumeEntryHeading
-  {\VAR{item.title | latex_escape}\BLOCK{if item.issuer} \textperiodcentered\ \textit{\small \VAR{item.issuer | latex_escape}}\BLOCK{endif}}
-  {\VAR{item.date_achieved.strftime("%b %Y") if item.date_achieved else ""}}
-\BLOCK{if item.description}\VAR{item.description | format_description}\BLOCK{endif}
+  \item \textbf{\VAR{item.title | latex_escape}}\BLOCK{if item.issuer}, \VAR{item.issuer | latex_escape}\BLOCK{endif}\BLOCK{if item.description} --- \VAR{item.description | format_inline_description}\BLOCK{endif}\BLOCK{if item.date_achieved} (\VAR{item.date_achieved.strftime("%b %Y")})\BLOCK{endif}
 \BLOCK{endfor}
+\end{itemize}
+\par
 
 \BLOCK{elif section.type == "awards"}
 \section*{\VAR{section.title | latex_escape}}
+\begin{itemize}[leftmargin=*,itemsep=0pt,topsep=2pt]
 \BLOCK{for item in section.entries}
-\resumeEntryHeading
-  {\VAR{item.title | latex_escape}\BLOCK{if item.issuer} \textperiodcentered\ \textit{\small \VAR{item.issuer | latex_escape}}\BLOCK{endif}}
-  {\VAR{item.date_received.strftime("%b %Y") if item.date_received else ""}}
-\BLOCK{if item.description}\VAR{item.description | format_description}\BLOCK{endif}
+  \item \textbf{\VAR{item.title | latex_escape}}\BLOCK{if item.issuer}, \VAR{item.issuer | latex_escape}\BLOCK{endif}\BLOCK{if item.description} --- \VAR{item.description | format_inline_description}\BLOCK{endif}\BLOCK{if item.date_received} (\VAR{item.date_received.strftime("%b %Y")})\BLOCK{endif}
 \BLOCK{endfor}
+\end{itemize}
+\par
 
 \BLOCK{elif section.type == "research"}
 \section*{\VAR{section.title | latex_escape}}
@@ -160,14 +160,12 @@
 
 \BLOCK{elif section.type == "leadership_roles"}
 \section*{\VAR{section.title | latex_escape}}
+\begin{itemize}[leftmargin=*,itemsep=0pt,topsep=2pt]
 \BLOCK{for item in section.entries}
-\resumeSubheading
-  {\VAR{item.title | latex_escape} \textperiodcentered\ \VAR{item.organization_name | latex_escape}}
-  {\VAR{item.start_date.strftime("%b %Y") if item.start_date else ""} -- \VAR{"Present" if item.is_current else (item.end_date.strftime("%b %Y") if item.end_date else "")}}
-  { }
-  { }
-\BLOCK{if item.description}\VAR{item.description | format_description}\BLOCK{endif}
+  \item \textbf{\VAR{item.title | latex_escape}}\BLOCK{if item.organization_name}, \VAR{item.organization_name | latex_escape}\BLOCK{endif}\BLOCK{if item.description} --- \VAR{item.description | format_inline_description}\BLOCK{endif}
 \BLOCK{endfor}
+\end{itemize}
+\par
 
 \BLOCK{elif section.type == "organizations"}
 \section*{\VAR{section.title | latex_escape}}

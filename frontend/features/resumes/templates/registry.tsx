@@ -14,31 +14,31 @@ export const TEMPLATE_REGISTRY: Record<TemplateSlug, TemplateDefinition> = {
     slug: "classic",
     name: "Classic",
     description: "A clean, single-column, ATS-friendly layout.",
-    defaultConfig: { accentColor: "#1a1a1a", fontFamily: "arial", spacing: "cozy" },
+    defaultConfig: { accentColor: "#1a1a1a", fontFamily: "arial", spacing: "cozy", boldMarkup: true },
   },
   modern: {
     slug: "modern",
     name: "Modern",
     description: "Bold headings with a strong accent, built for a contemporary look.",
-    defaultConfig: { accentColor: "#2c4a6e", fontFamily: "calibri", spacing: "cozy" },
+    defaultConfig: { accentColor: "#2c4a6e", fontFamily: "calibri", spacing: "cozy", boldMarkup: true },
   },
   minimal: {
     slug: "minimal",
     name: "Minimal",
     description: "Light typography and generous whitespace for an understated resume.",
-    defaultConfig: { accentColor: "#4a5563", fontFamily: "arial", spacing: "relaxed" },
+    defaultConfig: { accentColor: "#4a5563", fontFamily: "arial", spacing: "relaxed", boldMarkup: true },
   },
   compact: {
     slug: "compact",
     name: "Compact",
     description: "Denser spacing that fits more on the page — for longer histories.",
-    defaultConfig: { accentColor: "#1a1a1a", fontFamily: "arial", spacing: "compact" },
+    defaultConfig: { accentColor: "#1a1a1a", fontFamily: "arial", spacing: "compact", boldMarkup: true },
   },
   executive: {
     slug: "executive",
     name: "Executive",
     description: "A centered, formal layout for senior and leadership roles.",
-    defaultConfig: { accentColor: "#6b2b3a", fontFamily: "georgia", spacing: "cozy" },
+    defaultConfig: { accentColor: "#6b2b3a", fontFamily: "georgia", spacing: "cozy", boldMarkup: true },
   },
   ats_safe: {
     slug: "ats_safe",
@@ -48,7 +48,7 @@ export const TEMPLATE_REGISTRY: Record<TemplateSlug, TemplateDefinition> = {
     // and both are already single-column/minimal, so an identical accent
     // made them read as near-twins in the picker. Steel blue keeps things
     // professional while making the two immediately distinguishable.
-    defaultConfig: { accentColor: "#3b6690", fontFamily: "arial", spacing: "cozy" },
+    defaultConfig: { accentColor: "#3b6690", fontFamily: "arial", spacing: "cozy", boldMarkup: true },
   },
 };
 

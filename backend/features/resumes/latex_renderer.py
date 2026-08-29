@@ -8,8 +8,10 @@ from jinja2 import Environment, FileSystemLoader
 
 from features.resumes.latex_utils import (
     format_description,
+    format_inline_description,
     format_paragraph,
     latex_escape,
+    latex_inline,
     latex_safe_url,
 )
 from features.resumes.schemas import ResumeStyle
@@ -44,7 +46,9 @@ _latex_jinja_env = Environment(
     lstrip_blocks=True,
 )
 _latex_jinja_env.filters["latex_escape"] = latex_escape
+_latex_jinja_env.filters["latex_inline"] = latex_inline
 _latex_jinja_env.filters["format_description"] = format_description
+_latex_jinja_env.filters["format_inline_description"] = format_inline_description
 _latex_jinja_env.filters["format_paragraph"] = format_paragraph
 _latex_jinja_env.filters["latex_safe_url"] = latex_safe_url
 

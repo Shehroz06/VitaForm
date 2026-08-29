@@ -11,6 +11,7 @@ export function styleToConfig(style: ResumeStyle): TemplateConfig {
     fontFamily: style.font_family,
     spacing: style.spacing,
     contentDensity: style.content_density,
+    boldMarkup: style.bold_markup,
   };
 }
 
@@ -20,5 +21,6 @@ export function configToStyle(config: TemplateConfig): ResumeStyle {
     font_family: config.fontFamily,
     spacing: config.spacing,
     content_density: config.contentDensity ?? 1,
+    bold_markup: config.boldMarkup ?? true,
   };
 }

@@ -44,6 +44,9 @@ export interface TemplateConfig {
    * AI-generated resumes ever set it. Defaults to 1 (no shrink) wherever
    * unset -- template defaultConfigs in registry.tsx don't need it. */
   contentDensity?: number;
+  /** Whether **bold** markup in descriptions/summary renders as bold.
+   * Optional; treated as true wherever unset (see style-mapping.ts). */
+  boldMarkup?: boolean;
 }
 
 export interface TemplateDefinition {

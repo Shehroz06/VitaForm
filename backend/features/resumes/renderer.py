@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from markupsafe import Markup
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -13,6 +14,11 @@ from app.exceptions.base import ValidationException
 from features.profiles.models import Profile
 from features.projects.models import Project
 from features.resumes.description_units import split_description_into_units
+from features.resumes.inline_markup import (
+    render_description_inline_html,
+    render_inline_html,
+    strip_bold_markers,
+)
 from features.resumes.latex_renderer import LatexRenderer
 from features.resumes.models import Resume, ResumeTemplate, ResumeVersion
 from features.resumes.schemas import ResumeContent
@@ -37,6 +43,34 @@ _jinja_env = Environment(
 _jinja_env.filters["description_units"] = lambda text: (
     split_description_into_units(text)[0] if text else []
 )
+
+
+def _description_html(text: str | None) -> Markup:
+    """Always a bulleted list, one unit or many -- see
+    description_units.py's module docstring: a single real point rendering
+    as a one-item list is normal resume convention, and it keeps every
+    item's structure uniform (a lone bullet next to a bulleted list reads
+    as consistent; a lone plain-text line next to one doesn't).
+
+    Each unit is rendered through inline_markup so a ``**bold**`` span the
+    user typed becomes ``<strong>`` -- the text is still HTML-escaped
+    segment by segment, exactly as `escape()` did before."""
+    if not text:
+        return Markup("")
+    units = split_description_into_units(text)[0]
+    if not units:
+        return Markup("")
+    items = "".join(f"<li>{render_inline_html(unit)}</li>" for unit in units)
+    return Markup(f'<ul class="entry-description">{items}</ul>')
+
+
+_jinja_env.filters["description_html"] = _description_html
+# One flowing line instead of a sub-list, for the sections that render an
+# entry as a single bullet (leadership, awards, achievements).
+_jinja_env.filters["description_inline_html"] = render_description_inline_html
+# The summary is prose, never a list -- but a user may still bold a phrase
+# in it.
+_jinja_env.filters["inline_html"] = lambda text: render_inline_html(text) if text else Markup("")
 
 # Single source of truth for style.font_family -> real installed font stack,
 # so every Jinja2 template consumes the same resolved CSS value instead of
@@ -109,6 +143,7 @@ async def _fetch_section_items(
 
     title_field = TITLE_FIELDS.get(section_type)
     subtitle_field = SUBTITLE_FIELDS.get(section_type)
+    bold_markup = content.style.bold_markup
     resolved = []
     for item in items:
         key = str(item.id)
@@ -119,6 +154,16 @@ async def _fetch_section_items(
             overrides[title_field] = content.title_overrides[key]
         if subtitle_field and key in content.subtitle_overrides:
             overrides[subtitle_field] = content.subtitle_overrides[key]
+        if not bold_markup:
+            # The toggle is off: neutralise any ``**bold**`` the user typed
+            # before it reaches a template, so it renders as plain prose
+            # (not literal asterisks). Done here rather than in the
+            # templates so both render engines get it from one place.
+            effective = overrides.get("description")
+            if effective is None:
+                effective = item.description
+            if effective and "**" in effective:
+                overrides["description"] = strip_bold_markers(effective)
         resolved.append(_ItemOverrideView(item, overrides) if overrides else item)
     return resolved
 
@@ -153,8 +198,11 @@ class ResumeRenderer:
             title = section.custom_title or DEFAULT_SECTION_TITLES[section.section_type]
             if section.section_type is SectionType.SUMMARY:
                 if content.summary:
+                    summary_text = content.summary
+                    if not content.style.bold_markup and "**" in summary_text:
+                        summary_text = strip_bold_markers(summary_text)
                     resolved_sections.append(
-                        {"type": "summary", "title": title, "text": content.summary}
+                        {"type": "summary", "title": title, "text": summary_text}
                     )
                 continue
 

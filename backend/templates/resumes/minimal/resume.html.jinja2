@@ -37,11 +37,14 @@
   .entry-dates { font-size: calc(8.5pt * var(--density)); color: #aaa; white-space: nowrap; font-weight: 300; }
   .entry-description { margin: 4pt 0 0 0; padding-left: 13pt; color: #444; font-weight: 300; }
   .entry-description li { margin: 0 0 2pt 0; }
+  ul.compact-list { margin: 0; padding-left: 13pt; }
+  ul.compact-list li { margin: 0 0 2pt 0; }
   ul.skills-list { list-style: none; margin: 0; padding: 0; }
   ul.skills-list li {
     display: inline-block; padding: 0; margin: 0 12pt 4pt 0; font-size: calc(9pt * var(--density)); color: #555;
   }
   .links { font-size: calc(8.5pt * var(--density)); color: var(--accent); }
+  .links a { color: inherit; text-decoration: none; }
 </style>
 </head>
 <body>
@@ -64,7 +67,7 @@
   <h2 class="section-title">{{ section.title }}</h2>
 
   {% if section.type == "summary" %}
-    <p class="summary-text">{{ section.text }}</p>
+    <p class="summary-text">{{ section.text | inline_html }}</p>
 
   {% elif section.type == "education" %}
     {% for item in section.entries %}
@@ -80,7 +83,7 @@
         {{ item.degree }}{% if item.field_of_study %}, {{ item.field_of_study }}{% endif %}
         {% if item.grade %} · {{ item.grade }}{% endif %}
       </div>
-      {% if item.description %}<ul class="entry-description">{% for unit in item.description | description_units %}<li>{{ unit }}</li>{% endfor %}</ul>{% endif %}
+      {{ item.description | description_html }}
     </div>
     {% endfor %}
 
@@ -98,7 +101,7 @@
         {{ item.employment_type.value.replace("_", " ").title() }}
         {% if item.location %} · {{ item.location }}{% endif %}
       </div>
-      {% if item.description %}<ul class="entry-description">{% for unit in item.description | description_units %}<li>{{ unit }}</li>{% endfor %}</ul>{% endif %}
+      {{ item.description | description_html }}
     </div>
     {% endfor %}
 
@@ -112,15 +115,15 @@
         </span>
       </div>
       {% if item.role %}<div class="entry-subtitle">{{ item.role }}</div>{% endif %}
-      {% if item.description %}<ul class="entry-description">{% for unit in item.description | description_units %}<li>{{ unit }}</li>{% endfor %}</ul>{% endif %}
+      {{ item.description | description_html }}
       {% if item.skills %}
       <p class="links">{{ item.skills | map(attribute="name") | join(", ") }}</p>
       {% endif %}
       {% if item.repository_url or item.demo_url %}
       <p class="links">
-        {% if item.repository_url %}{{ item.repository_url }}{% endif %}
+        {% if item.repository_url %}<a href="{{ item.repository_url }}"><strong>GitHub</strong></a>{% endif %}
         {% if item.repository_url and item.demo_url %} · {% endif %}
-        {% if item.demo_url %}{{ item.demo_url }}{% endif %}
+        {% if item.demo_url %}<a href="{{ item.demo_url }}"><strong>Live</strong></a>{% endif %}
       </p>
       {% endif %}
     </div>
@@ -145,28 +148,22 @@
     {% endfor %}
 
   {% elif section.type == "achievements" %}
+    <ul class="compact-list">
     {% for item in section.entries %}
-    <div class="entry">
-      <div class="entry-row">
-        <span class="entry-title">{{ item.title }}</span>
-        <span class="entry-dates">{{ item.date_achieved.strftime("%b %Y") if item.date_achieved else "" }}</span>
-      </div>
-      {% if item.issuer %}<div class="entry-subtitle">{{ item.issuer }}</div>{% endif %}
-      {% if item.description %}<ul class="entry-description">{% for unit in item.description | description_units %}<li>{{ unit }}</li>{% endfor %}</ul>{% endif %}
-    </div>
+      <li>
+        <span class="entry-title">{{ item.title }}</span>{% if item.issuer %}, {{ item.issuer }}{% endif %}{% if item.description %} — {{ item.description | description_inline_html }}{% endif %}{% if item.date_achieved %} <span class="entry-dates">({{ item.date_achieved.strftime("%b %Y") }})</span>{% endif %}
+      </li>
     {% endfor %}
+    </ul>
 
   {% elif section.type == "awards" %}
+    <ul class="compact-list">
     {% for item in section.entries %}
-    <div class="entry">
-      <div class="entry-row">
-        <span class="entry-title">{{ item.title }}</span>
-        <span class="entry-dates">{{ item.date_received.strftime("%b %Y") if item.date_received else "" }}</span>
-      </div>
-      {% if item.issuer %}<div class="entry-subtitle">{{ item.issuer }}</div>{% endif %}
-      {% if item.description %}<ul class="entry-description">{% for unit in item.description | description_units %}<li>{{ unit }}</li>{% endfor %}</ul>{% endif %}
-    </div>
+      <li>
+        <span class="entry-title">{{ item.title }}</span>{% if item.issuer %}, {{ item.issuer }}{% endif %}{% if item.description %} — {{ item.description | description_inline_html }}{% endif %}{% if item.date_received %} <span class="entry-dates">({{ item.date_received.strftime("%b %Y") }})</span>{% endif %}
+      </li>
     {% endfor %}
+    </ul>
 
   {% elif section.type == "research" %}
     {% for item in section.entries %}
@@ -176,7 +173,7 @@
         <span class="entry-dates">{{ item.publication_date.strftime("%b %Y") if item.publication_date else "" }}</span>
       </div>
       {% if item.publication_venue %}<div class="entry-subtitle">{{ item.publication_venue }}</div>{% endif %}
-      {% if item.description %}<ul class="entry-description">{% for unit in item.description | description_units %}<li>{{ unit }}</li>{% endfor %}</ul>{% endif %}
+      {{ item.description | description_html }}
       {% if item.url %}<p class="links">{{ item.url }}</p>{% endif %}
     </div>
     {% endfor %}
@@ -191,23 +188,18 @@
           {{ "Present" if item.is_current else (item.end_date.strftime("%b %Y") if item.end_date else "") }}
         </span>
       </div>
-      {% if item.description %}<ul class="entry-description">{% for unit in item.description | description_units %}<li>{{ unit }}</li>{% endfor %}</ul>{% endif %}
+      {{ item.description | description_html }}
     </div>
     {% endfor %}
 
   {% elif section.type == "leadership_roles" %}
+    <ul class="compact-list">
     {% for item in section.entries %}
-    <div class="entry">
-      <div class="entry-row">
-        <span class="entry-title">{{ item.title }} · {{ item.organization_name }}</span>
-        <span class="entry-dates">
-          {{ item.start_date.strftime("%b %Y") if item.start_date else "" }} –
-          {{ "Present" if item.is_current else (item.end_date.strftime("%b %Y") if item.end_date else "") }}
-        </span>
-      </div>
-      {% if item.description %}<ul class="entry-description">{% for unit in item.description | description_units %}<li>{{ unit }}</li>{% endfor %}</ul>{% endif %}
-    </div>
+      <li>
+        <span class="entry-title">{{ item.title }}</span>{% if item.organization_name %}, {{ item.organization_name }}{% endif %}{% if item.description %} — {{ item.description | description_inline_html }}{% endif %}
+      </li>
     {% endfor %}
+    </ul>
 
   {% elif section.type == "organizations" %}
     {% for item in section.entries %}
@@ -222,7 +214,7 @@
         {% endif %}
       </div>
       {% if item.role %}<div class="entry-subtitle">{{ item.role }}</div>{% endif %}
-      {% if item.description %}<ul class="entry-description">{% for unit in item.description | description_units %}<li>{{ unit }}</li>{% endfor %}</ul>{% endif %}
+      {{ item.description | description_html }}
     </div>
     {% endfor %}
 
@@ -247,7 +239,7 @@
         {% if item.contact_phone %}{{ item.contact_phone }}{% endif %}
       </p>
       {% endif %}
-      {% if item.description %}<ul class="entry-description">{% for unit in item.description | description_units %}<li>{{ unit }}</li>{% endfor %}</ul>{% endif %}
+      {{ item.description | description_html }}
     </div>
     {% endfor %}
 
@@ -259,7 +251,7 @@
         <span class="entry-dates">{{ item.event_date.strftime("%b %Y") if item.event_date else "" }}</span>
       </div>
       {% if item.result %}<div class="entry-subtitle">{{ item.result }}</div>{% endif %}
-      {% if item.description %}<ul class="entry-description">{% for unit in item.description | description_units %}<li>{{ unit }}</li>{% endfor %}</ul>{% endif %}
+      {{ item.description | description_html }}
       {% if item.url %}<p class="links">{{ item.url }}</p>{% endif %}
     </div>
     {% endfor %}
@@ -272,7 +264,7 @@
         <span class="entry-dates">{{ item.event_date.strftime("%b %Y") if item.event_date else "" }}</span>
       </div>
       {% if item.result %}<div class="entry-subtitle">{{ item.result }}</div>{% endif %}
-      {% if item.description %}<ul class="entry-description">{% for unit in item.description | description_units %}<li>{{ unit }}</li>{% endfor %}</ul>{% endif %}
+      {{ item.description | description_html }}
     </div>
     {% endfor %}
 
@@ -284,7 +276,7 @@
         <span class="entry-dates">{{ item.filing_date.strftime("%b %Y") if item.filing_date else "" }}</span>
       </div>
       <div class="entry-subtitle">{{ item.status.value.replace("_", " ").title() }}</div>
-      {% if item.description %}<ul class="entry-description">{% for unit in item.description | description_units %}<li>{{ unit }}</li>{% endfor %}</ul>{% endif %}
+      {{ item.description | description_html }}
       {% if item.url %}<p class="links">{{ item.url }}</p>{% endif %}
     </div>
     {% endfor %}

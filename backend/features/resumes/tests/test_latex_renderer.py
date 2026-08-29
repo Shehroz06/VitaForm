@@ -64,6 +64,32 @@ def _minimal_context(**overrides: object) -> dict[str, object]:
     return context
 
 
+def test_latex_source_renders_leadership_compact_with_bold_and_no_literal_markers() -> None:
+    context = _minimal_context(
+        sections=[
+            {
+                "type": "leadership_roles",
+                "title": "Leadership",
+                "entries": [
+                    SimpleNamespace(
+                        title="Vice President",
+                        organization_name="NXC",
+                        description="Grew participation by **30%**.",
+                    )
+                ],
+            }
+        ]
+    )
+    source = LatexRenderer().render_source("ats_safe", **context)
+
+    assert r"\begin{itemize}" in source
+    assert r"\item \textbf{Vice President}, NXC" in source
+    assert r"\textbf{30\%}" in source
+    assert "**" not in source
+    # No date column for leadership anymore.
+    assert "resumeSubheading" not in source.split("Leadership", 1)[1].split("itemize", 1)[0]
+
+
 @pytest.mark.skipif(not _HAS_PDFLATEX, reason="pdflatex not installed on this machine")
 async def test_latex_renderer_produces_a_pdf() -> None:
     pdf_bytes = await LatexRenderer().render("ats_safe", **_minimal_context())

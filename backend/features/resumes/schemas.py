@@ -52,6 +52,12 @@ class ResumeStyle(BaseModel):
     # Multiplies font-size and numeric spacing/margins continuously, the
     # LaTeX-style lever between "spacing preset" and "delete content."
     content_density: float = Field(default=1.0, ge=0.8, le=1.0)
+    # When False, ``**bold**`` spans a user typed into a description or the
+    # summary render as plain text (markers stripped) instead of bold --
+    # see inline_markup.py and renderer.py. Default True so existing
+    # resumes and every new one keep the emphasis a user marked; the
+    # builder's TemplateCustomizer exposes it as a toggle.
+    bold_markup: bool = True
 
 
 _OverrideText = Annotated[str, Field(max_length=2000)]

@@ -167,6 +167,9 @@ function AwardDialogContent({ editing, onDone }: { editing: Award | null; onDone
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="description">Description</Label>
           <Textarea id="description" rows={3} {...register("description")} />
+          <p className="text-xs text-muted-foreground">
+            Wrap a phrase in **double asterisks** to render it bold on your resume.
+          </p>
         </div>
         <DialogFooter>
           <Button type="submit" disabled={isPending}>

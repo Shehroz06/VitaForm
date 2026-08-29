@@ -761,9 +761,10 @@ async def test_autofit_aggressive_condenses_or_removes_items_plain_autofit_would
     # At least one lever beyond plain spacing/density was actually used --
     # either some descriptions were condensed (an override recorded) or the
     # lowest-priority (last-listed) entries were dropped outright.
-    assert data["version"]["content"]["description_overrides"] or len(
-        education_section["item_ids"]
-    ) < 12
+    assert (
+        data["version"]["content"]["description_overrides"]
+        or len(education_section["item_ids"]) < 12
+    )
     # Whichever earlier-listed entries survive must still be present in
     # order -- aggressive fit drops from the *end* (lowest position score),
     # never reorders or drops from the middle/front.
@@ -909,6 +910,119 @@ async def test_export_resume_with_all_extended_section_types_renders_pdf(
     assert pdf_response.content[:4] == b"%PDF"
 
 
+async def test_leadership_awards_achievements_render_compact_with_bold_markdown(
+    client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    """The three short-form sections render one bullet per entry
+    (``Title, Org -- description``), and a ``**bold**`` span a user typed
+    into a description reaches the PDF as bold text with the ``**`` markers
+    gone -- never as literal asterisks."""
+    headers = await _auth(client, captured_emails, "resumeCompactBold@example.com")
+    template_id = await _classic_template_id(client)
+
+    leadership_id = (
+        await client.post(
+            "/api/v1/leadership-roles",
+            headers=headers,
+            json={
+                "organization_name": "NXC",
+                "title": "Vice President",
+                "start_date": "2024-08-01",
+                "is_current": True,
+                "description": "Led operations and grew participation by **30%**.",
+            },
+        )
+    ).json()["data"]["id"]
+    award_id = (
+        await client.post(
+            "/api/v1/awards",
+            headers=headers,
+            json={
+                "title": "Best Intern",
+                "issuer": "PureLogics",
+                "date_received": "2025-09-01",
+                "description": "Ranked **1st** among 10 peers.",
+            },
+        )
+    ).json()["data"]["id"]
+    achievement_id = (
+        await client.post(
+            "/api/v1/achievements",
+            headers=headers,
+            json={
+                "title": "Runner Up",
+                "issuer": "Quantum Hackathon",
+                "description": "Placed **2nd overall** at the national event.",
+            },
+        )
+    ).json()["data"]["id"]
+
+    resume_id = (
+        await client.post(
+            "/api/v1/resumes",
+            headers=headers,
+            json={"title": "Compact Sections Resume", "template_id": template_id},
+        )
+    ).json()["data"]["id"]
+
+    content_response = await client.put(
+        f"/api/v1/resumes/{resume_id}/content",
+        headers=headers,
+        json={
+            "summary": None,
+            "contact_visibility": {},
+            "sections": [
+                {"section_type": "leadership_roles", "visible": True, "item_ids": [leadership_id]},
+                {"section_type": "awards", "visible": True, "item_ids": [award_id]},
+                {"section_type": "achievements", "visible": True, "item_ids": [achievement_id]},
+            ],
+        },
+    )
+    assert content_response.status_code == 200
+
+    file_data = (await client.post(f"/api/v1/resumes/{resume_id}/export", headers=headers)).json()[
+        "data"
+    ]
+    pdf_response = await client.get(file_data["url"], headers=headers)
+    with pymupdf.open(stream=pdf_response.content, filetype="pdf") as doc:
+        text = doc[0].get_text()
+
+    assert "**" not in text
+    assert "30%" in text
+    assert "2nd overall" in text
+    # Title and organization sit on the same flowing line now, not a
+    # header row split from a date column.
+    assert "Vice President, NXC" in " ".join(text.split())
+    assert "Best Intern, PureLogics" in " ".join(text.split())
+
+    # With the bold-keywords toggle off, the same **markers** are stripped
+    # to plain prose -- still never literal asterisks in the PDF.
+    style_off = await client.put(
+        f"/api/v1/resumes/{resume_id}/content",
+        headers=headers,
+        json={
+            "summary": None,
+            "contact_visibility": {},
+            "style": {"bold_markup": False},
+            "sections": [
+                {"section_type": "leadership_roles", "visible": True, "item_ids": [leadership_id]},
+                {"section_type": "awards", "visible": True, "item_ids": [award_id]},
+                {"section_type": "achievements", "visible": True, "item_ids": [achievement_id]},
+            ],
+        },
+    )
+    assert style_off.status_code == 200
+    file_data = (await client.post(f"/api/v1/resumes/{resume_id}/export", headers=headers)).json()[
+        "data"
+    ]
+    pdf_response = await client.get(file_data["url"], headers=headers)
+    with pymupdf.open(stream=pdf_response.content, filetype="pdf") as doc:
+        text_off = doc[0].get_text()
+    assert "**" not in text_off
+    assert "30%" in text_off
+    assert "2nd overall" in text_off
+
+
 async def test_re_exporting_replaces_the_previous_rendered_file(
     client: AsyncClient, captured_emails: list[dict[str, str]]
 ) -> None:
@@ -964,9 +1078,7 @@ async def test_export_resume_renders_for_every_template_with_custom_style(
     ):
         if slug == "ats_safe" and not _HAS_PDFLATEX:
             continue
-        template_id = next(
-            t["id"] for t in templates_response.json()["data"] if t["slug"] == slug
-        )
+        template_id = next(t["id"] for t in templates_response.json()["data"] if t["slug"] == slug)
         create_response = await client.post(
             "/api/v1/resumes",
             headers=headers,
@@ -992,9 +1104,7 @@ async def test_export_resume_renders_for_every_template_with_custom_style(
             },
         )
 
-        export_response = await client.post(
-            f"/api/v1/resumes/{resume_id}/export", headers=headers
-        )
+        export_response = await client.post(f"/api/v1/resumes/{resume_id}/export", headers=headers)
         assert export_response.status_code == 200, f"{slug} failed to export"
         file_data = export_response.json()["data"]
 
@@ -1033,9 +1143,7 @@ async def test_export_stays_legible_at_the_content_density_floor(
     for slug in slugs:
         if slug == "ats_safe" and not _HAS_PDFLATEX:
             continue
-        template_id = next(
-            t["id"] for t in templates_response.json()["data"] if t["slug"] == slug
-        )
+        template_id = next(t["id"] for t in templates_response.json()["data"] if t["slug"] == slug)
         create_response = await client.post(
             "/api/v1/resumes",
             headers=headers,
@@ -1062,9 +1170,7 @@ async def test_export_stays_legible_at_the_content_density_floor(
             },
         )
 
-        export_response = await client.post(
-            f"/api/v1/resumes/{resume_id}/export", headers=headers
-        )
+        export_response = await client.post(f"/api/v1/resumes/{resume_id}/export", headers=headers)
         assert export_response.status_code == 200, f"{slug} failed to export at density floor"
         file_data = export_response.json()["data"]
 

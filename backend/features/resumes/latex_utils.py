@@ -1,6 +1,9 @@
 """Every user-controlled string that reaches the LaTeX renderer goes through
-one of these two functions -- names, headlines, bios, company/institution
-names, descriptions, URLs. Never interpolate raw text into a .tex source
+one of these functions -- names, headlines, bios, company/institution
+names, descriptions, URLs. `latex_escape` is the primitive; `latex_inline`,
+`format_description`, `format_inline_description` and `format_paragraph`
+build on it for the fields where a user may also type ``**bold**`` (see
+inline_markup.py). Never interpolate raw text into a .tex source
 file: LaTeX's own control characters (backslash, braces, $, &, #, ^, _, ~,
 %) turn arbitrary profile text into arbitrary LaTeX commands otherwise.
 `-no-shell-escape` at the pdflatex invocation (see latex_renderer.py) is the
@@ -10,6 +13,7 @@ correctness layer: escaped text should just print as itself, verbatim."""
 import re
 
 from features.resumes.description_units import split_description_into_units
+from features.resumes.inline_markup import join_description_units, split_inline_spans
 
 _ESCAPE_MAP: dict[str, str] = {
     "\\": r"\textbackslash{}",
@@ -55,6 +59,29 @@ def latex_escape(text: str | None) -> str:
     return _ESCAPE_RE.sub(lambda match: _ESCAPE_MAP[match.group(0)], text)
 
 
+def latex_inline(text: str | None) -> str:
+    """One run of user text as LaTeX: every segment `latex_escape`d, and
+    any ``**bold**`` span wrapped in ``\\textbf{}`` (see inline_markup.py).
+    The LaTeX counterpart of renderer.py's HTML inline rendering -- used
+    everywhere a description or the summary is typeset, so a metric a user
+    marked bold in the profile renders bold in both engines."""
+    if not text:
+        return ""
+    parts: list[str] = []
+    for segment, is_bold in split_inline_spans(text):
+        rendered = latex_escape(segment)
+        parts.append(rf"\textbf{{{rendered}}}" if is_bold else rendered)
+    return "".join(parts)
+
+
+def format_inline_description(text: str | None) -> str:
+    """A whole description rejoined into one flowing, escaped, bold-aware
+    line -- for the sections that render an entry as a single \\item
+    (leadership, awards, achievements) rather than an itemize sub-list."""
+    joined = join_description_units(text)
+    return latex_inline(joined) if joined else ""
+
+
 def format_description(text: str | None) -> str:
     """Renders a description as a LaTeX `itemize` block, one \\item per
     unit -- always, regardless of whether the stored text happens to be
@@ -70,7 +97,7 @@ def format_description(text: str | None) -> str:
     if not units:
         return ""
 
-    items = "\n".join(f"  \\item {latex_escape(unit)}" for unit in units)
+    items = "\n".join(f"  \\item {latex_inline(unit)}" for unit in units)
     # \par is required, not cosmetic: the .tex.jinja2 template's trim_blocks
     # setting eats the newline after the {% endif %} that wraps this call,
     # so whatever comes next in the template (a links line, the next
@@ -92,4 +119,4 @@ def format_paragraph(text: str | None) -> str:
     if not text or not text.strip():
         return ""
     lines = [line.strip() for line in text.splitlines() if line.strip()]
-    return latex_escape(" ".join(lines)) + "\n\\par"
+    return latex_inline(" ".join(lines)) + "\n\\par"
