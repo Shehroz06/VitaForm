@@ -26,8 +26,16 @@ linkedin_rate_limit = UserRateLimit("ai:linkedin", max_requests=20, window_secon
 cv_import_rate_limit = UserRateLimit("ai:cv-import", max_requests=10, window_seconds=3600)
 
 # Rendering endpoints: each triggers a real pdflatex/WeasyPrint compile.
-# Not AI-costly, but still CPU-expensive, so a looser per-user cap (these
-# fire routinely while a user is actively editing in the builder).
+# Not AI-costly, but still CPU-expensive, so a per-user cap sized to the
+# call pattern rather than a single flat number.
+#
+# export/autofit are explicit one-off clicks -- 60/hour is already far
+# past any real session. preview is different: the builder refetches it
+# after every debounced autosave (~1 render per editing pause) *and* a
+# multi-page resume fetches one request per page, so an active editing
+# session legitimately generates hundreds of these. Its cap is set high
+# enough that a normal session never hits it, while still bounding a
+# runaway client.
 resume_export_rate_limit = UserRateLimit(
     "render:resume-export", max_requests=60, window_seconds=3600
 )
@@ -35,8 +43,8 @@ resume_autofit_rate_limit = UserRateLimit(
     "render:resume-autofit", max_requests=60, window_seconds=3600
 )
 resume_preview_rate_limit = UserRateLimit(
-    "render:resume-preview", max_requests=120, window_seconds=3600
+    "render:resume-preview", max_requests=900, window_seconds=3600
 )
 template_preview_rate_limit = UserRateLimit(
-    "render:template-preview", max_requests=120, window_seconds=3600
+    "render:template-preview", max_requests=600, window_seconds=3600
 )
